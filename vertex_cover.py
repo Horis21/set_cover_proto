@@ -127,19 +127,21 @@ def one_off_features(df):
 def solve(df):
     cache = Cache()
     pq = queue.PriorityQueue()
-    cache.one_off[df] = one_off_features(df)
-    cache.vertex_cover[df] = vertex_cover_features(df)
+    cache.put_one_offs(df, one_off_features(df))
+    cache.put_vertex_cover(df, vertex_cover_features(df))
     for i in range(df.shape[1]-1):
         priority = 4
-        if i in cache.one_off[df]:
+        if i in cache.get_one_offs(df):
             priority -= 2
-        if i in cache.vertex_cover[df]:
+        if i in cache.get_vertex_cover(df):
             priority -= 1 
 
-        pq.put((priority,Node(df, i, None)))
+        pq.put((priority, Node(df, i, None,None)))
 
-    while pq:
-        
+    while not pq.empty():
+        root = pq.get()[1]
+        print(root)
+
 
 
 
