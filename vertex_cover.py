@@ -5,7 +5,9 @@ import queue
 from gurobipy import GRB, quicksum
 from classes.Node import Node
 from classes.Cache import Cache
+import random
 import sys
+import copy
 
 def get_difference_table(df):
     # Split positive and negative instances (column 0 is the label)
@@ -57,7 +59,7 @@ def vertex_cover_features(df):
         diff_table = get_difference_table(df)
         features = find_vertex_cover(diff_table, verbose=False)
         #print("Require features: ", features)
-        return features
+        return features, len(features)
     else:
         lower_bound = 0
         counts = np.zeros(df.shape[1] - 1, dtype=int)
@@ -82,9 +84,12 @@ def vertex_cover_features(df):
 
         # print the final lower bound
         #print(f"Require at least {lower_bound} features")
-        return feature_order
+        return feature_order, lower_bound
     
-def possible_features(df):
+def possible_features(df, cache : Cache):
+    features = cache.get_possbile_feats(df)
+    if features is not None:
+        return features
     features = set([i for i in range(df.shape[1]-1)])
     features_present = np.zeros(df.shape[1]-1)
 
@@ -93,15 +98,16 @@ def possible_features(df):
 
     for i, f in enumerate(features_present):
         if f == 0: features.remove(i) #Remove all features that aren't present in any class
-
+    cache.put_possible_feats(df, features)
     return features
 
     
-def one_off_features(df):
+def one_off_features(df, cache):
+    pos_features = possible_features(df, cache)
+
     pos = set(tuple(x) for x in df[df[0] == 1].values)
     neg = set(tuple(x) for x in df[df[0] == 0].values)
 
-    pos_features = possible_features(df)
     ignore_feaures = set()
     features = []
     
@@ -124,28 +130,135 @@ def one_off_features(df):
                 ignore_feaures.add(f)
     return features
 
+#Split data based on feature f
+def split(df, f):
+    return df[df[f+1] == 0], df[df[f+1]==1]
+
+#Check if the dataset is pure
+def check_leaf(df):
+    if df[df[0] == 0].size == 0 or df[df[0] == 1].size == 0:
+        return True
+    else:
+        return False
+
+
+#Fast forward upper bound of a dataset
+def fast_forward(df, pos_features):
+    if check_leaf(df):
+        return 0
+    else:
+        f =  random.choice(list(pos_features))
+        left, right = split(df,f)
+        return fast_forward(left, pos_features) + fast_forward(right, pos_features) + 1
+    
+#Return one_offs, cover_features and vertex cover lower bound    
+def get_features(df, cache : Cache):
+    one_offs = cache.get_one_offs(df)
+    if one_offs is None:
+        one_offs = one_off_features(df, cache)
+        cache.put_one_offs(df, one_offs)
+    cover_features = cache.get_vertex_cover(df)
+    vclb = 0
+    if cover_features is None:
+        cover_features, vclb = vertex_cover_features(df)
+        cache.put_vertex_cover(df, cover_features)
+    return one_offs, cover_features, vclb
+
+def backpropagate(node : Node, cache : Cache):
+    data = node.df
+    pos_feats = cache.get_possbile_feats(data)
+    if node.parent is None:
+        node.update_local_bounds(pos_feats) #If root still check if maybe some childrent can be pruned
+        return
+    
+    parent = node.parent
+    f = node.parent_feat
+    
+    #Add bounds for the chid at feature f
+    parent.add_child_lower(f, node.isLeft, max(cache.get_lower(data), node.lower))
+    parent.add_child_upper(f, node.isLeft, min(cache.get_upper(data), node.upper))
+   
+    #Update local bounds for the parent based on updates on children
+    pos_feats = cache.get_possbile_feats(parent.df)
+    parent.update_local_bounds(pos_feats)
+    backpropagate(parent,cache)
+    
+   
+
+
 def solve(df):
     cache = Cache()
     pq = queue.PriorityQueue()
-    cache.put_one_offs(df, one_off_features(df))
-    cache.put_vertex_cover(df, vertex_cover_features(df))
-    for i in range(df.shape[1]-1):
-        priority = 4
-        if i in cache.get_one_offs(df):
-            priority -= 2
-        if i in cache.get_vertex_cover(df):
-            priority -= 1 
-
-        pq.put((priority, Node(df, i, None,None)))
+    pos_features = possible_features(df, cache)
+    
+    #Add the root
+    pq.put((1, Node(df, None, None, None)))
 
     while not pq.empty():
         root = pq.get()[1]
-        print(root)
 
+        if not root.feasible: 
+            continue #Skip nodes deemed unfeasible
 
+        data = root.df
+        solution =cache.get_solution(data) #Check if solution already found
+        if solution is not None:
+            solution = copy.deepcopy(solution)
+            solution.parent = root.parent 
+            root = solution  #Hopefully this does what I think it does (replaces the reference in the parent)
+            continue
+       
 
+        if check_leaf(data):
+            cache.put_lower(data, 0)
+            cache.put_upper(data, 0)
+            backpropagate(root, cache) #Backpropagate the bounds for the found leaf node
+            root.mark_ready(cache) #Mark solution found for subproblem
+            continue
+        else:
+            cache.put_lower(data, 1) #Lower bound of 1 if it's not a pure node
 
+        pos_features = possible_features(data, cache)
+        if cache.get_upper(data) is None:
+            ff = fast_forward(data, pos_features) #Compute fast forward upper bound
+            cache.put_upper(data, ff)
+        root.put_node_upper(cache.get_upper(data)) #Add the dataset upper bound to the node upper bound
 
+        one_offs, cover_features, vclb = get_features(data, cache)
+        llb = max(len(one_offs), vclb)
+        cache.put_lower(data, llb) #Add lower bound based on vertex cover and one_offs
+        root.put_node_lower(cache.get_lower(data))
+
+        if root.parent is not None:
+            pub = root.parent.upper - 1
+            root.put_node_upper(pub) #Add the upper bound coming from the parent just for the node
+
+        #Backpropagate the bounds
+        backpropagate(root, cache)
+
+        if not root.feasible: #Stop if bounds are not looking good
+            continue
+
+        #Search for all features
+        for i in pos_features:
+            #Split the data based on feature i
+            left_df, right_df = split(data, i)
+            left = Node(left_df, i, root, True)
+            right = Node(right_df, i, root, False)
+            root.lefts[i] = left
+            root.rights[i] = right
+
+            #Compute priority of the child nodes
+            priority = 4
+            if i in one_offs:
+                priority -= 2  # One_off features is 100% sure to be in the optimal tree
+            if i in cover_features:
+                priority -= 1  # Vertex cover feature is only highly likely to be present
+
+            pq.put((priority, left))
+            pq.put((priority, right))
+
+    print("done")
 
 
 if __name__ == "__main__":
