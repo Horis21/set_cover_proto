@@ -39,6 +39,8 @@ class Node:
         
     #Mark subproblem solved
     def mark_ready(self, cache : Cache):
+        self.cut_branches()
+
         cache.put_solution(self.df, self)
         if self.parent is None:
             return
@@ -60,9 +62,14 @@ class Node:
     def update_local_bounds(self, pos_features):
         upper = 20000000
         lower = 20000000
+
+        seen = False
         #This could be optimized in a future versions by checking if bounds for all childs have been added and only checking 
         # if the bound for the feature we are updating is changing the bound for the whole node
         for f in pos_features:
+            if (self.lefts.get(f) is not None and not self.lefts[f].feasible) or (self.rights.get(f) is not None and not self.rights[f].feasible):
+                continue #Don't update with bounds from infeasible children
+            seen = True
             if self.lowers.get(f) is None:
                 self.lowers[f] =  ChildrenBounds(True)
             if self.uppers.get(f) is None:
@@ -70,16 +77,17 @@ class Node:
             upper = min(upper, self.uppers[f].left + self.uppers[f].right + 1)
             lower = min(lower, self.lowers[f].left + self.lowers[f].right + 1)
 
-        if lower == 4:
-            print("aaaaaaa")
-            for feat in pos_features:
-                print(self.lowers[feat].left, " ", self.lowers[feat].right)
+        if not seen:
+            lower = 0
+
         self.put_node_upper(upper)
         print("Putting lower from bounds updating")
         self.put_node_lower(lower)
 
         print(f"Updated local bounds: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
         print("Lefts and rights: ")
+        for feat in pos_features:
+                print(self.lowers[feat].left, " ", self.lowers[feat].right)
 
 
         #Prune whole branch if infeasible

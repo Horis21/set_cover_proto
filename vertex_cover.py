@@ -138,7 +138,7 @@ def split(df, f):
 
 #Check if the dataset is pure
 def check_leaf(df):
-    if df[df[0] == 0].size == 0 or df[df[0] == 1].size == 0:
+    if df.empty or df[df[0] == 0].size == 0 or df[df[0] == 1].size == 0:
         return True
     else:
         return False
@@ -170,8 +170,9 @@ def get_features(df, cache : Cache):
 def backpropagate(node : Node, cache : Cache):
     print("Backpropagating")
     data = node.df
-    pos_feats = cache.get_possbile_feats(data)
-    node.update_local_bounds(possible_features(data, cache)) #If root still check if maybe some childrent can be pruned
+    pos_feats = possible_features(data, cache)
+    if cache.get_upper(data) != 0: #Skip leaves
+        node.update_local_bounds(pos_feats) #If root still check if maybe some childrent can be pruned
     if node.parent is None:
         return
     
@@ -234,6 +235,8 @@ def solve(df):
         if check_leaf(data):
             print("Leaf node found.")
             cache.put_lower(data, 0)
+            root.put_node_lower(0)
+            root.put_node_upper(0)
             cache.put_upper(data, 0)
             backpropagate(root, cache) #Backpropagate the bounds for the found leaf node
             root.mark_ready(cache) #Mark solution found for subproblem
