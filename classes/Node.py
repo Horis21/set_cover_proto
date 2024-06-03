@@ -70,10 +70,17 @@ class Node:
             upper = min(upper, self.uppers[f].left + self.uppers[f].right + 1)
             lower = min(lower, self.lowers[f].left + self.lowers[f].right + 1)
 
+        if lower == 4:
+            print("aaaaaaa")
+            for feat in pos_features:
+                print(self.lowers[feat].left, " ", self.lowers[feat].right)
         self.put_node_upper(upper)
+        print("Putting lower from bounds updating")
         self.put_node_lower(lower)
 
         print(f"Updated local bounds: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
+        print("Lefts and rights: ")
+
 
         #Prune whole branch if infeasible
         if self.lower > self.upper:

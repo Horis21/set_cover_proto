@@ -166,22 +166,24 @@ def get_features(df, cache : Cache):
     return one_offs, cover_features, vclb
 
 def backpropagate(node : Node, cache : Cache):
+    print("Backpropagating")
     data = node.df
     pos_feats = cache.get_possbile_feats(data)
+    node.update_local_bounds(pos_feats) #If root still check if maybe some childrent can be pruned
     if node.parent is None:
-        node.update_local_bounds(pos_feats) #If root still check if maybe some childrent can be pruned
         return
     
     parent = node.parent
     f = node.parent_feat
     
     #Add bounds for the chid at feature f
+    print("Propagating bounds from child")
     parent.add_child_lower(f, node.isLeft, max(cache.get_lower(data), node.lower))
     parent.add_child_upper(f, node.isLeft, min(cache.get_upper(data), node.upper))
    
     #Update local bounds for the parent based on updates on children
     pos_feats = cache.get_possbile_feats(parent.df)
-    parent.update_local_bounds(pos_feats)
+    #parent.update_local_bounds(pos_feats)
     backpropagate(parent,cache)
     
    
@@ -246,13 +248,16 @@ def solve(df):
 
         one_offs, cover_features, vclb = get_features(data, cache)
         llb = max(len(one_offs), vclb)
+        print("Putting lower bound from vc or feats")
+        print("one offs: ",len(one_offs) )
+        print("vclb: ", vclb)
         cache.put_lower(data, llb) #Add lower bound based on vertex cover and one_offs
         root.put_node_lower(cache.get_lower(data))
         print("Dataset lower bound: ", cache.get_lower(data))
 
         if root.parent is not None:
             pub = root.parent.upper - 1
-            root.put_node_upper(pub) #Add the upper bound coming from the parent just for the node
+            #root.put_node_upper(pub) #Add the upper bound coming from the parent just for the node
 
         #Backpropagate the bounds
         backpropagate(root, cache)
