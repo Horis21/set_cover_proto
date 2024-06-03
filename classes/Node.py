@@ -73,6 +73,8 @@ class Node:
         self.put_node_upper(upper)
         self.put_node_lower(lower)
 
+        print(f"Updated local bounds: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
+
         #Prune whole branch if infeasible
         if self.lower > self.upper:
             self.cut_branches()
@@ -104,6 +106,7 @@ class Node:
             self.lowers[f].left = bound
         else:
             self.lowers[f].right = bound
+        print(f"Added child lower bound: node = {str(self)}, isLeft = {isLeft}, bound = {bound}")
 
     def add_child_upper(self, f, isLeft,bound):
         if self.uppers.get(f) is None:
@@ -112,16 +115,23 @@ class Node:
             self.uppers[f].left = bound
         else:
             self.uppers[f].right = bound
+        print(f"Added child upper bound:node = {str(self)}, isLeft = {isLeft}, bound = {bound}")
 
 
     def put_node_upper(self, bound):
+        previous_upper = self.upper
         self.upper = min(self.upper, bound)
+        if self.upper != previous_upper:
+            print(f"Updated node upper bound:node = {str(self)}, new upper = {self.upper}")
 
     def put_node_lower(self, bound):
+        previous_lower = self.lower
         self.lower = max(self.lower, bound)
+        if self.lower != previous_lower:
+            print(f"Updated node lower bound: node = {str(self)}, new lower = {self.lower}")
 
     def __str__(self):
-        return "feature: " + str(self.f) + " parent_feat: " + str(self.parent_feat)
+        return "dataset: " + str(self.df) + " parent_feat: " + str(self.parent_feat) + " is_left: " + str(self.isLeft)
     
     #Comparison methods otherwise priority queue bricks
     def __eq__(self, other):

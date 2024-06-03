@@ -190,7 +190,7 @@ def print_solution(root : Node):
     q.put(root)
     while not q.empty():
         node = q.get()
-        print(node)
+        print(node.f)
         if node.left is not None:
             q.put(node.left)
         if node.right is not None:
@@ -209,6 +209,7 @@ def solve(df):
         root = pq.get()[1]
         print("Looking at node: ", root)
         if not root.feasible: 
+            print("Node is not feasible, skipping.")
             continue #Skip nodes deemed unfeasible
 
         data = root.df
@@ -227,6 +228,7 @@ def solve(df):
        
 
         if check_leaf(data):
+            print("Leaf node found.")
             cache.put_lower(data, 0)
             cache.put_upper(data, 0)
             backpropagate(root, cache) #Backpropagate the bounds for the found leaf node
@@ -256,6 +258,7 @@ def solve(df):
         backpropagate(root, cache)
 
         if not root.feasible: #Stop if bounds are not looking good
+            print("Node became infeasible after backpropagation, skipping.")
             continue
 
         #Search for all features
@@ -282,8 +285,8 @@ def solve(df):
 
 if __name__ == "__main__":
     #df = pd.read_csv("anneal.csv", sep=" ", header=None)
-    df = pd.read_csv("monk3_bin.csv", sep=" ", header=None)
-    #df = pd.read_csv("test.csv", sep=" ", header=None)
+    #df = pd.read_csv("monk3_bin.csv", sep=" ", header=None)
+    df = pd.read_csv("test.csv", sep=" ", header=None)
     #print("vertex_cover_features: ", vertex_cover_features(df))
     #print("of-by-one feature: ", one_off_features(df))
 
