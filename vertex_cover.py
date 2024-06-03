@@ -3,9 +3,9 @@ import numpy as np
 import gurobipy as grb
 import queue
 from gurobipy import GRB, quicksum
+from sklearn.tree import DecisionTreeClassifier
 from classes.Node import Node
 from classes.Cache import Cache
-import random
 import sys
 import copy
 
@@ -147,9 +147,10 @@ def fast_forward(df, pos_features):
     if check_leaf(df):
         return 0
     else:
-        f =  random.choice(list(pos_features))
-        left, right = split(df,f)
-        return fast_forward(left, pos_features) + fast_forward(right, pos_features) + 1
+        X = df[df.columns[[f + 1 for f in pos_features]]]
+        cart = DecisionTreeClassifier()
+        cart.fit(X, df[0])
+        return cart.get_n_leaves() - 1
     
 #Return one_offs, cover_features and vertex cover lower bound    
 def get_features(df, cache : Cache):
@@ -184,19 +185,29 @@ def backpropagate(node : Node, cache : Cache):
     backpropagate(parent,cache)
     
    
-
+def print_solution(root : Node):
+    q = queue.Queue()
+    q.put(root)
+    while not q.empty():
+        node = q.get()
+        print(node)
+        if node.left is not None:
+            q.put(node.left)
+        if node.right is not None:
+            q.put(node.right)
 
 def solve(df):
     cache = Cache()
     pq = queue.PriorityQueue()
     pos_features = possible_features(df, cache)
     
+    first = Node(df, None, None, None)
     #Add the root
-    pq.put((1, Node(df, None, None, None)))
+    pq.put((1, first))
 
     while not pq.empty():
         root = pq.get()[1]
-
+        print("Looking at node: ", root)
         if not root.feasible: 
             continue #Skip nodes deemed unfeasible
 
@@ -204,8 +215,14 @@ def solve(df):
         solution =cache.get_solution(data) #Check if solution already found
         if solution is not None:
             solution = copy.deepcopy(solution)
+            solution.parent_feat = root.parent_feat
             solution.parent = root.parent 
-            root = solution  #Hopefully this does what I think it does (replaces the reference in the parent)
+            if root.isLeft:
+                root.parent.lefts[root.parent_feat] = solution
+            else:
+                root.parent.rights[root.parent_feat] = solution
+            root.parent.update_local_bounds(cache.get_possbile_feats(root.parent.df))
+            root.parent.check_ready(cache)
             continue
        
 
@@ -223,11 +240,13 @@ def solve(df):
             ff = fast_forward(data, pos_features) #Compute fast forward upper bound
             cache.put_upper(data, ff)
         root.put_node_upper(cache.get_upper(data)) #Add the dataset upper bound to the node upper bound
+        print("Dataset upper bound: ", cache.get_upper(data))
 
         one_offs, cover_features, vclb = get_features(data, cache)
         llb = max(len(one_offs), vclb)
         cache.put_lower(data, llb) #Add lower bound based on vertex cover and one_offs
         root.put_node_lower(cache.get_lower(data))
+        print("Dataset lower bound: ", cache.get_lower(data))
 
         if root.parent is not None:
             pub = root.parent.upper - 1
@@ -257,8 +276,8 @@ def solve(df):
 
             pq.put((priority, left))
             pq.put((priority, right))
-
     print("done")
+    print_solution(first)
 
 
 if __name__ == "__main__":

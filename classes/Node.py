@@ -1,4 +1,3 @@
-import sys
 from classes.ChildrenBounds import ChildrenBounds
 from classes.ChildrenReady import ChildrenReady
 from classes.Cache import Cache
@@ -11,7 +10,7 @@ class Node:
         self.isLeft = isLeft
         self.lowers = {}
         self.f = None
-        self.upper = sys.maxsize
+        self.upper = 20000000
         self.lower = 0
         self.feasible = True
         self.uppers = {}
@@ -59,8 +58,8 @@ class Node:
         
 
     def update_local_bounds(self, pos_features):
-        upper = 0
-        lower = sys.maxsize
+        upper = 20000000
+        lower = 20000000
         #This could be optimized in a future versions by checking if bounds for all childs have been added and only checking 
         # if the bound for the feature we are updating is changing the bound for the whole node
         for f in pos_features:
@@ -68,7 +67,7 @@ class Node:
                 self.lowers[f] =  ChildrenBounds(True)
             if self.uppers.get(f) is None:
                 self.uppers[f] = ChildrenBounds(False)
-            upper = max(upper, self.uppers[f].left + self.uppers[f].right + 1)
+            upper = min(upper, self.uppers[f].left + self.uppers[f].right + 1)
             lower = min(lower, self.lowers[f].left + self.lowers[f].right + 1)
 
         self.put_node_upper(upper)
@@ -122,7 +121,7 @@ class Node:
         self.lower = max(self.lower, bound)
 
     def __str__(self):
-        return "feature: " + str(self.f) + " ,left: " + str(self.left) + " ,right: "+ str(self.right)
+        return "feature: " + str(self.f) + " parent_feat: " + str(self.parent_feat)
     
     #Comparison methods otherwise priority queue bricks
     def __eq__(self, other):
