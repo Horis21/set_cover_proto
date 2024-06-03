@@ -103,6 +103,7 @@ def possible_features(df, cache : Cache):
 
     
 def one_off_features(df, cache):
+    print("Computing one off features for: ", df)
     pos_features = possible_features(df, cache)
 
     pos = set(tuple(x) for x in df[df[0] == 1].values)
@@ -118,7 +119,7 @@ def one_off_features(df, cache):
                 continue
             label = row[0]
             new_row = np.copy(row)
-            new_row[f] = np.logical_xor(1, new_row[f]) #Compute the off-by-one feature vector
+            new_row[f+1] = np.logical_xor(1, new_row[f+1]) #Compute the off-by-one feature vector
             new_row[0] = np.logical_xor(1, new_row[0])
             new_row = tuple(new_row)
             #Check in the opposing class
@@ -128,6 +129,7 @@ def one_off_features(df, cache):
             elif neg.__contains__(new_row):
                 features.append(f)
                 ignore_feaures.add(f)
+    print("One-off features: ", features)
     return features
 
 #Split data based on feature f
@@ -169,7 +171,7 @@ def backpropagate(node : Node, cache : Cache):
     print("Backpropagating")
     data = node.df
     pos_feats = cache.get_possbile_feats(data)
-    node.update_local_bounds(pos_feats) #If root still check if maybe some childrent can be pruned
+    node.update_local_bounds(possible_features(data, cache)) #If root still check if maybe some childrent can be pruned
     if node.parent is None:
         return
     
