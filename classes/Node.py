@@ -22,8 +22,9 @@ class Node:
         self.parent = parent
     
     def check_ready(self, cache : Cache):
+
         #If lower bound is not equal to upper means that there still might be better solutions out there
-        if self.lower != self.upper:
+        if self.lower != self.upper or not self.feasible:
             return
         for f in cache.get_possbile_feats(self.df):
             if self.solutions.get(f) is None:
@@ -32,14 +33,42 @@ class Node:
             right = self.rights[f]
             #Check that both children from that branch are marked as solved and the solution can't be improved
             if self.solutions[f].left and self.solutions[f].right and cache.get_lower(left.df) + cache.get_lower(right.df) + 1 == self.lower:
+                print(f"Solution found: node = {str(self)}, f = {f}")
                 self.f = f
                 self.left = self.lefts[f]
                 self.right = self.rights[f]
+                print("Marking ready")
                 self.mark_ready(cache)
+                parent = self.parent
+                print("Pruning siblings")
+                if self.parent is None:
+                    return
+                for feat in cache.get_possbile_feats(parent.df):
+                    if feat != self.parent_feat:
+                        print("Pruning sibling with feat: ", feat)
+                        print("Selected feat: ", f)
+                        parent.lefts[feat].cut_branches()
+                        parent.rights[feat].cut_branches()
+                print("Done pruning siblings")
+                return
+        for f in cache.get_possbile_feats(self.df):
+            if self.lefts.get(f) is None or self.rights.get(f) is None:
+                continue
+            left = self.lefts[f]
+            right = self.rights[f]
+            if cache.get_lower(left.df) is None or cache.get_lower(right.df) is None:
+                continue
+            #Check that both children from that branch are marked as solved and the solution can't be improved
+            if cache.get_lower(left.df) + cache.get_lower(right.df) + 1 == self.lower:
+                left.check_ready(cache)
+                right.check_ready(cache)
+            
         
     #Mark subproblem solved
     def mark_ready(self, cache : Cache):
-        self.cut_branches()
+        # self.cut_branches()
+        # if not self.feasible:
+        #     return
 
         cache.put_solution(self.df, self)
         if self.parent is None:
@@ -59,7 +88,7 @@ class Node:
             parent.check_ready(cache)
         
 
-    def update_local_bounds(self, pos_features):
+    def update_local_bounds(self, pos_features, cache):
         upper = 20000000
         lower = 20000000
 
@@ -78,7 +107,9 @@ class Node:
             lower = min(lower, self.lowers[f].left + self.lowers[f].right + 1)
 
         if not seen:
-            lower = 0
+            print(f"Pruning because of infeasible children: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
+            self.cut_branches()
+            return
 
         self.put_node_upper(upper)
         print("Putting lower from bounds updating")
@@ -89,29 +120,34 @@ class Node:
         for feat in pos_features:
                 print(self.lowers[feat].left, " ", self.lowers[feat].right)
 
+        if self.lower == self.upper:
+            self.check_ready(cache)
 
         #Prune whole branch if infeasible
         if self.lower > self.upper:
+            print(f"Pruning: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
             self.cut_branches()
             return
         
         #Prune subbranch if children pair is infeasible
         for f in pos_features:
             if self.lowers[f].left + self.lowers[f].right + 1 > self.upper:
+                print(f"Pruning subrannch: node = {str(self)}, branch = {f},lower = {self.lower}, upper = {self.upper}")
                 self.lefts[f].cut_branches()
 
         
     def cut_branches(self):
+        print(f"Cutting: node = {str(self)}, parent_feat = {self.parent_feat}, isLeft = {self.isLeft},lower = {self.lower}, upper = {self.upper}")
         self.feasible = False
         for left in self.lefts.values():
             left.cut_branches()
         for rigth in self.rights.values():
             rigth.cut_branches()
-        if self.parent is not None:
-            if self.isLeft:
-                self.parent.rights[self.parent_feat].cut_branches
-            else:
-                self.parent.lefts[self.parent_feat].cut_branches
+        # if self.parent is not None:
+        #     if self.isLeft:
+        #         self.parent.rights[self.parent_feat].cut_branches
+        #     else:
+        #         self.parent.lefts[self.parent_feat].cut_branches
 
     #Duplicated code can be refactored
     def add_child_lower(self, f, isLeft,bound):
@@ -146,7 +182,7 @@ class Node:
             print(f"Updated node lower bound: node = {str(self)}, new lower = {self.lower}")
 
     def __str__(self):
-        return "dataset: " + str(self.df) + " parent_feat: " + str(self.parent_feat) + " is_left: " + str(self.isLeft)
+        return "dataset: " + str(self.df) + " parent_feat: " + str(self.parent_feat) + " is_left: " + str(self.isLeft) + " feasible: " + str(self.feasible) + " feature: " + str(self.f) + " upper: " + str(self.upper) + " lower: " + str(self.lower)
     
     #Comparison methods otherwise priority queue bricks
     def __eq__(self, other):

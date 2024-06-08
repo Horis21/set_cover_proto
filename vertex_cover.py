@@ -172,7 +172,9 @@ def backpropagate(node : Node, cache : Cache):
     data = node.df
     pos_feats = possible_features(data, cache)
     if cache.get_upper(data) != 0: #Skip leaves
-        node.update_local_bounds(pos_feats) #If root still check if maybe some childrent can be pruned
+        node.update_local_bounds(pos_feats, cache) #If root still check if maybe some childrent can be pruned
+    if not node.feasible:
+        return
     if node.parent is None:
         return
     
@@ -209,9 +211,10 @@ def solve(df):
     first = Node(df, None, None, None)
     #Add the root
     pq.put((1, first))
-
+    list = []
     while not pq.empty():
         root = pq.get()[1]
+        list.append(root)
         print("Looking at node: ", root)
         if not root.feasible: 
             print("Node is not feasible, skipping.")
@@ -220,15 +223,17 @@ def solve(df):
         data = root.df
         solution =cache.get_solution(data) #Check if solution already found
         if solution is not None:
-            solution = copy.deepcopy(solution)
-            solution.parent_feat = root.parent_feat
-            solution.parent = root.parent 
+            print("Solution already existing in cache: ", str(solution))
+            sol= copy.deepcopy(solution)
+            sol.parent_feat = root.parent_feat
+            sol.parent = root.parent 
+            sol.isLeft = root.isLeft
             if root.isLeft:
-                root.parent.lefts[root.parent_feat] = solution
+                root.parent.lefts[root.parent_feat] = sol
             else:
-                root.parent.rights[root.parent_feat] = solution
-            root.parent.update_local_bounds(cache.get_possbile_feats(root.parent.df))
-            root.parent.check_ready(cache)
+                root.parent.rights[root.parent_feat] = sol
+            sol.mark_ready(cache)
+            root.parent.update_local_bounds(cache.get_possbile_feats(root.parent.df), cache)
             continue
        
 
@@ -291,6 +296,13 @@ def solve(df):
             pq.put((priority, right))
     print("done")
     print_solution(first)
+    # for x in list:
+    #     print(x)
+    # for f in range(2):
+    #     print(first.solutions[f].left, " ", first.solutions[f].right)
+
+    # for f in range(2):
+    #     print(first.lefts[f].feasible, " ", first.rights[f].feasible)
 
 
 if __name__ == "__main__":
