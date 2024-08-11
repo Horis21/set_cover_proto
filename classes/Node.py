@@ -33,23 +33,23 @@ class Node:
             right = self.rights[f]
             #Check that both children from that branch are marked as solved and the solution can't be improved
             if self.solutions[f].left and self.solutions[f].right and cache.get_lower(left.df) + cache.get_lower(right.df) + 1 == self.lower:
-                print(f"Solution found: node = {str(self)}, f = {f}")
+                #print(f"Solution found: node = {str(self)}, f = {f}")
                 self.f = f
                 self.left = self.lefts[f]
                 self.right = self.rights[f]
-                print("Marking ready")
+                #print("Marking ready")
                 self.mark_ready(cache)
                 parent = self.parent
-                print("Pruning siblings")
+                #print("Pruning siblings")
                 if self.parent is None:
                     return
                 for feat in cache.get_possbile_feats(parent.df):
                     if feat != self.parent_feat:
-                        print("Pruning sibling with feat: ", feat)
-                        print("Selected feat: ", f)
+                        #print("Pruning sibling with feat: ", feat)
+                        #print("Selected feat: ", f)
                         parent.lefts[feat].cut_branches()
                         parent.rights[feat].cut_branches()
-                print("Done pruning siblings")
+                #print("Done pruning siblings")
                 return
         for f in cache.get_possbile_feats(self.df):
             if self.lefts.get(f) is None or self.rights.get(f) is None:
@@ -107,37 +107,34 @@ class Node:
             lower = min(lower, self.lowers[f].left + self.lowers[f].right + 1)
 
         if not seen:
-            print(f"Pruning because of infeasible children: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
+            #print(f"Pruning because of infeasible children: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
             self.cut_branches()
             return
 
         self.put_node_upper(upper)
-        print("Putting lower from bounds updating")
         self.put_node_lower(lower)
 
-        print(f"Updated local bounds: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
-        print("Lefts and rights: ")
-        for feat in pos_features:
-                print(self.lowers[feat].left, " ", self.lowers[feat].right)
+        #print(f"Updated local bounds: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
+        #print("Lefts and rights: ")
 
         if self.lower == self.upper:
             self.check_ready(cache)
 
         #Prune whole branch if infeasible
         if self.lower > self.upper:
-            print(f"Pruning: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
+            #print(f"Pruning: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
             self.cut_branches()
             return
         
         #Prune subbranch if children pair is infeasible
         for f in pos_features:
             if self.lowers[f].left + self.lowers[f].right + 1 > self.upper:
-                print(f"Pruning subrannch: node = {str(self)}, branch = {f},lower = {self.lower}, upper = {self.upper}")
+                #print(f"Pruning subrannch: node = {str(self)}, branch = {f},lower = {self.lower}, upper = {self.upper}")
                 self.lefts[f].cut_branches()
 
         
     def cut_branches(self):
-        print(f"Cutting: node = {str(self)}, parent_feat = {self.parent_feat}, isLeft = {self.isLeft},lower = {self.lower}, upper = {self.upper}")
+        #print(f"Cutting: node = {str(self)}")
         self.feasible = False
         for left in self.lefts.values():
             left.cut_branches()
@@ -157,7 +154,7 @@ class Node:
             self.lowers[f].left = bound
         else:
             self.lowers[f].right = bound
-        print(f"Added child lower bound: node = {str(self)}, isLeft = {isLeft}, bound = {bound}")
+        #print(f"Added child lower bound: node = {str(self)}, isLeft = {isLeft}, bound = {bound}")
 
     def add_child_upper(self, f, isLeft,bound):
         if self.uppers.get(f) is None:
@@ -166,24 +163,30 @@ class Node:
             self.uppers[f].left = bound
         else:
             self.uppers[f].right = bound
-        print(f"Added child upper bound:node = {str(self)}, isLeft = {isLeft}, bound = {bound}")
+        #print(f"Added child upper bound:node = {str(self)}, isLeft = {isLeft}, bound = {bound}")
 
 
     def put_node_upper(self, bound):
         previous_upper = self.upper
         self.upper = min(self.upper, bound)
-        if self.upper != previous_upper:
-            print(f"Updated node upper bound:node = {str(self)}, new upper = {self.upper}")
+        #if self.upper != previous_upper:
+            #print(f"Updated node upper bound:node = {str(self)}, new upper = {self.upper}")
 
     def put_node_lower(self, bound):
         previous_lower = self.lower
         self.lower = max(self.lower, bound)
-        if self.lower != previous_lower:
-            print(f"Updated node lower bound: node = {str(self)}, new lower = {self.lower}")
+        #if self.lower != previous_lower:
+            #print(f"Updated node lower bound: node = {str(self)}, new lower = {self.lower}")
 
-    def __str__(self):
-        return "dataset: " + str(self.df) + " parent_feat: " + str(self.parent_feat) + " is_left: " + str(self.isLeft) + " feasible: " + str(self.feasible) + " feature: " + str(self.f) + " upper: " + str(self.upper) + " lower: " + str(self.lower)
+    # def __str__(self):
+    #     return "dataset: " + str(self.df) + " parent_feat: " + str(self.parent_feat) + " is_left: " + str(self.isLeft) + " feasible: " + str(self.feasible) + " feature: " + str(self.f) + " upper: " + str(self.upper) + " lower: " + str(self.lower)
     
+    def __str__(self):
+        if self.parent is None:
+            return "root"
+        direction = "left" if self.isLeft else "right"
+        return str(self.parent) + " " + direction + " " + str(self.parent_feat)
+
     #Comparison methods otherwise priority queue bricks
     def __eq__(self, other):
         return True

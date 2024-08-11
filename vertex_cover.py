@@ -103,7 +103,7 @@ def possible_features(df, cache : Cache):
 
     
 def one_off_features(df, cache):
-    print("Computing one off features for: ", df)
+    #print("Computing one off features for: ", df)
     pos_features = possible_features(df, cache)
 
     pos = set(tuple(x) for x in df[df[0] == 1].values)
@@ -129,7 +129,7 @@ def one_off_features(df, cache):
             elif neg.__contains__(new_row):
                 features.append(f)
                 ignore_feaures.add(f)
-    print("One-off features: ", features)
+    #print("One-off features: ", features)
     return features
 
 #Split data based on feature f
@@ -168,7 +168,7 @@ def get_features(df, cache : Cache):
     return one_offs, cover_features, vclb
 
 def backpropagate(node : Node, cache : Cache):
-    print("Backpropagating")
+    #print("Backpropagating")
     data = node.df
     pos_feats = possible_features(data, cache)
     if cache.get_upper(data) != 0: #Skip leaves
@@ -182,7 +182,7 @@ def backpropagate(node : Node, cache : Cache):
     f = node.parent_feat
     
     #Add bounds for the chid at feature f
-    print("Propagating bounds from child")
+    #print("Propagating bounds from child")
     parent.add_child_lower(f, node.isLeft, max(cache.get_lower(data), node.lower))
     parent.add_child_upper(f, node.isLeft, min(cache.get_upper(data), node.upper))
    
@@ -217,13 +217,13 @@ def solve(df):
         list.append(root)
         print("Looking at node: ", root)
         if not root.feasible: 
-            print("Node is not feasible, skipping.")
+            #print("Node is not feasible, skipping.")
             continue #Skip nodes deemed unfeasible
 
         data = root.df
         solution =cache.get_solution(data) #Check if solution already found
         if solution is not None:
-            print("Solution already existing in cache: ", str(solution))
+            #print("Solution already existing in cache: ", str(solution))
             sol= copy.deepcopy(solution)
             sol.parent_feat = root.parent_feat
             sol.parent = root.parent 
@@ -254,16 +254,16 @@ def solve(df):
             ff = fast_forward(data, pos_features) #Compute fast forward upper bound
             cache.put_upper(data, ff)
         root.put_node_upper(cache.get_upper(data)) #Add the dataset upper bound to the node upper bound
-        print("Dataset upper bound: ", cache.get_upper(data))
+        #print("Dataset upper bound: ", cache.get_upper(data))
 
         one_offs, cover_features, vclb = get_features(data, cache)
         llb = max(len(one_offs), vclb)
-        print("Putting lower bound from vc or feats")
-        print("one offs: ",len(one_offs) )
-        print("vclb: ", vclb)
+        #print("Putting lower bound from vc or feats")
+        #print("one offs: ",len(one_offs) )
+        #print("vclb: ", vclb)
         cache.put_lower(data, llb) #Add lower bound based on vertex cover and one_offs
         root.put_node_lower(cache.get_lower(data))
-        print("Dataset lower bound: ", cache.get_lower(data))
+        #print("Dataset lower bound: ", cache.get_lower(data))
 
         if root.parent is not None:
             pub = root.parent.upper - 1
@@ -273,7 +273,7 @@ def solve(df):
         backpropagate(root, cache)
 
         if not root.feasible: #Stop if bounds are not looking good
-            print("Node became infeasible after backpropagation, skipping.")
+            #print("Node became infeasible after backpropagation, skipping.")
             continue
 
         #Search for all features
