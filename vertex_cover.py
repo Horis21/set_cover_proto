@@ -206,7 +206,11 @@ def print_solution(root : Node):
 def solve(df):
     cache = Cache()
     pq = queue.PriorityQueue()
+
     pos_features = possible_features(df, cache)
+    max_nodes = fast_forward(df, pos_features)
+    search_space = len(pos_features)**max_nodes
+    explored = 0
     
     first = Node(df, None, None, None)
     #Add the root
@@ -248,6 +252,8 @@ def solve(df):
             continue
         else:
             cache.put_lower(data, 1) #Lower bound of 1 if it's not a pure node
+
+        explored += 1 #Only updated explored nodes if not a leaf and not in cache
 
         pos_features = possible_features(data, cache)
         if cache.get_upper(data) is None:
@@ -295,6 +301,9 @@ def solve(df):
             pq.put((priority, left))
             pq.put((priority, right))
     print("done")
+    print("Search space is:",search_space)
+    print("Only explored:", explored)
+    print("Percentage of search space pruned:",(search_space-explored)/search_space*100)
     print_solution(first)
     # for x in list:
     #     print(x)
