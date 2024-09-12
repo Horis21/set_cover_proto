@@ -17,9 +17,33 @@ class Node:
         self.solutions = {}
         self.lefts = {}
         self.rights = {}
+        self.best = None
         self.left = None
         self.right = None
         self.parent = parent
+
+
+    def prune_siblings(self, cache : Cache):
+        parent = self.parent
+        for feat in cache.get_possbile_feats(parent.df):
+            if feat != self.parent_feat:
+                parent.lefts[feat].cut_branches()
+                parent.rights[feat].cut_branches()
+
+
+    def link_and_prune(self, solution, cache : Cache):
+        sol= self.deepcopy(solution)
+        sol.parent_feat = self.parent_feat
+        sol.parent = self.parent 
+        sol.parent.f = self.parent_feat
+        sol.isLeft = self.isLeft
+        if self.isLeft:
+            self.parent.lefts[self.parent_feat] = sol
+        else:
+            self.parent.rights[self.parent_feat] = sol
+        sol.prune_siblings(cache)
+        sol.mark_ready(cache)
+        sol.parent.update_local_bounds(cache, self.parent_feat)
     
     def check_ready(self, cache : Cache):
 
@@ -27,7 +51,7 @@ class Node:
         if self.lower != self.upper or not self.feasible:
             return
         for f in cache.get_possbile_feats(self.df):
-            if self.solutions.get(f) is None:
+            if self.solutions.get(f) is None or self.lefts.get(f) is None or self.rights.get(f) is None:
                 continue
             left = self.lefts[f]
             right = self.rights[f]
@@ -37,31 +61,12 @@ class Node:
                 self.f = f
                 self.left = self.lefts[f]
                 self.right = self.rights[f]
-                #print("Marking ready")
                 self.mark_ready(cache)
-                parent = self.parent
-                #print("Pruning siblings")
-                if self.parent is None:
-                    return
-                for feat in cache.get_possbile_feats(parent.df):
-                    if feat != self.parent_feat:
-                        #print("Pruning sibling with feat: ", feat)
-                        #print("Selected feat: ", f)
-                        parent.lefts[feat].cut_branches()
-                        parent.rights[feat].cut_branches()
-                #print("Done pruning siblings")
+              
+                if self.parent is not None:
+                    self.prune_siblings(cache)
+                
                 return
-        for f in cache.get_possbile_feats(self.df):
-            if self.lefts.get(f) is None or self.rights.get(f) is None:
-                continue
-            left = self.lefts[f]
-            right = self.rights[f]
-            if cache.get_lower(left.df) is None or cache.get_lower(right.df) is None:
-                continue
-            #Check that both children from that branch are marked as solved and the solution can't be improved
-            if cache.get_lower(left.df) + cache.get_lower(right.df) + 1 == self.lower:
-                left.check_ready(cache)
-                right.check_ready(cache)
             
         
     #Mark subproblem solved
@@ -75,24 +80,40 @@ class Node:
             return
         f = self.parent_feat
         parent = self.parent
+
         if parent.solutions.get(f) is None:
             parent.solutions[f] = ChildrenReady()
 
         if self.isLeft:
             parent.solutions[f].left = True
+            if not parent.solutions[f].right and parent.rights.get(f) is not None:
+                parent.rights[f].check_ready(cache)
         else:
             parent.solutions[f].right = True
+            if not parent.solutions[f].left and parent.lefts.get(f) is not None:
+                parent.lefts[f].check_ready(cache)
+
 
         #If sibling is solved as well maybe parent is also solved
         if parent.solutions[f].left and parent.solutions[f].right:
             parent.check_ready(cache)
         
 
-    def update_local_bounds(self, pos_features, cache):
+    def update_local_bounds(self, cache : Cache, f):
+
+        #Prune subbranch if children pair is infeasible
+        if self.lefts.get(f) is None or self.rights.get(f) is None or not self.lefts[f].feasible or not self.rights[f].feasible or self.lowers[f].left + self.lowers[f].right + 1 > self.upper:
+                #print(f"Pruning subrannch: node = {str(self)}, branch = {f},lower = {self.lower}, upper = {self.upper}")
+                if self.lefts.get(f) is not None:
+                    self.lefts[f].cut_branches()
+                if self.rights.get(f) is not None:
+                    self.rights[f].cut_branches()
+                return False
+      
         upper = 20000000
         lower = 20000000
 
-        seen = False
+        pos_features = cache.get_possbile_feats(self.df)
         #This could be optimized in a future versions by checking if bounds for all childs have been added and only checking 
         # if the bound for the feature we are updating is changing the bound for the whole node
         for f in pos_features:
@@ -106,31 +127,33 @@ class Node:
             upper = min(upper, self.uppers[f].left + self.uppers[f].right + 1)
             lower = min(lower, self.lowers[f].left + self.lowers[f].right + 1)
 
-        if not seen:
-            #print(f"Pruning because of infeasible children: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
-            self.cut_branches()
-            return
 
-        self.put_node_upper(upper)
-        self.put_node_lower(lower)
+        updated = False
+        if upper < self.upper:
+            self.put_node_upper(upper)
+            updated = True
+        if lower > self.lower:
+            self.put_node_lower(lower)
+            updated = True
 
-        #print(f"Updated local bounds: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
+        if not updated:
+            return False
+
+        if self.parent is None:
+            print(f"Updated local bounds for root lower = {self.lower}, upper = {self.upper}")
         #print("Lefts and rights: ")
 
         if self.lower == self.upper:
             self.check_ready(cache)
+            return True
 
         #Prune whole branch if infeasible
         if self.lower > self.upper:
             #print(f"Pruning: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
             self.cut_branches()
-            return
+            return False
         
-        #Prune subbranch if children pair is infeasible
-        for f in pos_features:
-            if self.lowers[f].left + self.lowers[f].right + 1 > self.upper:
-                #print(f"Pruning subrannch: node = {str(self)}, branch = {f},lower = {self.lower}, upper = {self.upper}")
-                self.lefts[f].cut_branches()
+        return True
 
         
     def cut_branches(self):
