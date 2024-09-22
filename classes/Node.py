@@ -180,7 +180,7 @@ class Node:
                 # print("found root solution")
             #self.save_best(f)
             self.link_and_prune(self.best, cache)
-            return False #because link and prune already backpropagates
+            return True #because link and prune already backpropagates
 
         #Prune whole branch if infeasible
         if self.lower > self.upper:
