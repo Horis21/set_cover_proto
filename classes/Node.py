@@ -41,8 +41,6 @@ class Node:
         # if self.parent is None:
         #     print("feature for root solution: ", solution.f)
 
-        self.upper = solution.upper
-        self.lower = solution.lower
         self.left = solution.left
         self.right = solution.right
         
@@ -128,6 +126,9 @@ class Node:
 
     def update_local_bounds(self, cache : Cache, f):
 
+        if self.parent is None:
+            print("Current root bounds in update local bounds: ", self.lower, "and", self.upper)
+
         #Prune subbranch if children pair is infeasible
         if self.lefts.get(f) is not None and self.rights.get(f) is not None and (not self.lefts[f].feasible or not self.rights[f].feasible or self.lefts[f].lower + self.rights[f].lower + 1 > self.upper):
                 #print(f"Pruning subrannch: node = {str(self)}, branch = {f},lower = {self.lower}, upper = {self.upper}")
@@ -137,8 +138,8 @@ class Node:
                     self.rights[f].cut_branches()
                 return False
       
-        upper = 20000000
-        lower = 20000000
+        childrenUpper = 20000000
+        childrenLower = 20000000
 
         pos_features = cache.get_possbile_feats(self.df)
         #This could be optimized in a future versions by checking if bounds for all childs have been added and only checking 
@@ -146,23 +147,25 @@ class Node:
         for feature in pos_features:
             if self.lefts.get(feature) is None or not self.lefts[feature].feasible or self.rights.get(feature) is None or not self.rights[feature].feasible:
                 continue #Don't update with bounds from infeasible children
-            upper = min(upper, self.lefts[feature].lower + self.rights[feature].lower + 1)
-            lower = min(lower, self.lefts[feature].lower + self.rights[feature].upper + 1)
+            childrenUpper = min(childrenUpper, self.lefts[feature].lower + self.rights[feature].lower + 1)
+            childrenLower = min(childrenLower, self.lefts[feature].lower + self.rights[feature].upper + 1)
 
+        if childrenLower == 20000000:
+            childrenLower = 0 #Lower bound is 0 if no feasible childrent have been yet created
 
         updated = False
-        if upper < self.upper:
+        if childrenUpper < self.upper:
             if self.parent is None:
                 print("updated the best for root at some point")
-            cache.put_upper(self.df, upper)
+            cache.put_upper(self.df, childrenUpper)
             #New best solution found
             self.save_best(f)
-            self.put_node_upper(upper)
-            cache.put_upper(self.df, upper)
+            self.put_node_upper(childrenUpper)
+            cache.put_upper(self.df, childrenUpper)
             updated = True
-        if lower > self.lower:
-            cache.put_lower(self.df, lower)
-            self.put_node_lower(lower)
+        if childrenLower > self.lower:
+            cache.put_lower(self.df, childrenLower)
+            self.put_node_lower(childrenLower)
             updated = True
 
         if not updated:
@@ -206,15 +209,15 @@ class Node:
     def put_node_upper(self, bound):
         previous_upper = self.upper
         self.upper = min(self.upper, bound)
-        # if self.upper != previous_upper:
-            # print(f"Updated node upper bound:node = {str(self)}, new upper = {self.upper}")
+        if self.upper != previous_upper:
+            print(f"Updated node upper bound:node = {str(self)}, new upper = {self.upper}")
 
     def put_node_lower(self, bound):
         # print("with bound =", bound)
         previous_lower = self.lower
         self.lower = max(self.lower, bound)
-        # if self.lower != previous_lower:
-            # print(f"Updated node lower bound: node = {str(self)}, new lower = {self.lower}")
+        if self.lower != previous_lower:
+            print(f"Updated node lower bound: node = {str(self)}, new lower = {self.lower}")
 
     # def __str__(self):
     #     return "dataset: " + str(self.df) + " parent_feat: " + str(self.parent_feat) + " is_left: " + str(self.isLeft) + " feasible: " + str(self.feasible) + " feature: " + str(self.f) + " upper: " + str(self.upper) + " lower: " + str(self.lower)

@@ -272,6 +272,7 @@ def solve(df):
     computeUB(first,cache)
     list = []
     while not pq.empty():
+        print("Current root bounds in main loop: ", first.lower, "and", first.upper)
         root = pq.get()[1]
         list.append(root)
         print("Looking at node: ", root)
@@ -284,6 +285,8 @@ def solve(df):
         if solution is not None:
             print("Solution already existing in cache: ", str(solution))
             root.link_and_prune(solution, cache)
+            root.lower = solution.lower
+            root.upper = solution.upper
             continue
        
 
@@ -310,7 +313,7 @@ def solve(df):
         
         #Get the features needed for computing priority
         one_offs, cover_features, vclb = get_features(data, cache)
-
+        pos_features = possible_features(data, cache)
         #Search for all features
         for i in pos_features:
             #Split the data based on feature i
