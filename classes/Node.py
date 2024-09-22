@@ -1,19 +1,16 @@
-from classes.ChildrenBounds import ChildrenBounds
 from classes.ChildrenReady import ChildrenReady
 from classes.Cache import Cache
-
+import copy
 
 class Node:
     def __init__(self, df, parent_feat, parent ,isLeft):
         self.df = df
         self.parent_feat = parent_feat
         self.isLeft = isLeft
-        self.lowers = {}
         self.f = None
         self.upper = 20000000
         self.lower = 0
         self.feasible = True
-        self.uppers = {}
         self.solutions = {}
         self.lefts = {}
         self.rights = {}
@@ -22,28 +19,52 @@ class Node:
         self.right = None
         self.parent = parent
 
+    def backpropagate(self, cache : Cache):
+        print("Backpropagating")
+        if not self.feasible:
+            return
+        if self.parent is None:
+            return
+        
+        parent = self.parent
+        f = self.parent_feat
+
+        if parent.update_local_bounds(cache, f):
+            #Backpropagate further only if bounds were updated
+            parent.backpropagate(cache)
+
+    def link_and_prune(self, solution, cache : Cache):
+        if solution.lower > self.upper:
+            # print("wrongfully linked")
+            self.cut_branches()
+            return
+        # if self.parent is None:
+        #     print("feature for root solution: ", solution.f)
+
+        self.upper = solution.upper
+        self.lower = solution.lower
+        self.left = solution.left
+        self.right = solution.right
+        
+        self.f = solution.f
+
+        self.feasible = True #Sanity check hehe
+
+        self.prune_siblings(cache)
+        self.backpropagate(cache)
+        self.mark_ready(cache)
 
     def prune_siblings(self, cache : Cache):
         parent = self.parent
+
+        if parent is None:
+            return
+        
         for feat in cache.get_possbile_feats(parent.df):
             if feat != self.parent_feat:
                 parent.lefts[feat].cut_branches()
                 parent.rights[feat].cut_branches()
 
-
-    def link_and_prune(self, solution, cache : Cache):
-        sol= self.deepcopy(solution)
-        sol.parent_feat = self.parent_feat
-        sol.parent = self.parent 
-        sol.parent.f = self.parent_feat
-        sol.isLeft = self.isLeft
-        if self.isLeft:
-            self.parent.lefts[self.parent_feat] = sol
-        else:
-            self.parent.rights[self.parent_feat] = sol
-        sol.prune_siblings(cache)
-        sol.mark_ready(cache)
-        sol.parent.update_local_bounds(cache, self.parent_feat)
     
     def check_ready(self, cache : Cache):
 
@@ -98,11 +119,20 @@ class Node:
         if parent.solutions[f].left and parent.solutions[f].right:
             parent.check_ready(cache)
         
+    def save_best(self, f):
+        best = Node(self.df, self.parent_feat, self.parent, self.isLeft)
+        best.f = f
+        best.feasible = True #sanity check :()
+        best.left = self.lefts[f].best
+        best.right = self.rights[f].best
+        best.lower = self.lower
+        best.upper = self.upper
+        self.best = best
 
     def update_local_bounds(self, cache : Cache, f):
 
         #Prune subbranch if children pair is infeasible
-        if self.lefts.get(f) is None or self.rights.get(f) is None or not self.lefts[f].feasible or not self.rights[f].feasible or self.lowers[f].left + self.lowers[f].right + 1 > self.upper:
+        if self.lefts.get(f) is not None and self.rights.get(f) is not None and (not self.lefts[f].feasible or not self.rights[f].feasible or self.lefts[f].lower + self.rights[f].lower + 1 > self.upper):
                 #print(f"Pruning subrannch: node = {str(self)}, branch = {f},lower = {self.lower}, upper = {self.upper}")
                 if self.lefts.get(f) is not None:
                     self.lefts[f].cut_branches()
@@ -116,23 +146,25 @@ class Node:
         pos_features = cache.get_possbile_feats(self.df)
         #This could be optimized in a future versions by checking if bounds for all childs have been added and only checking 
         # if the bound for the feature we are updating is changing the bound for the whole node
-        for f in pos_features:
-            if (self.lefts.get(f) is not None and not self.lefts[f].feasible) or (self.rights.get(f) is not None and not self.rights[f].feasible):
+        for feature in pos_features:
+            if self.lefts.get(feature) is None or not self.lefts[feature].feasible or self.rights.get(feature) is None or not self.rights[feature].feasible:
                 continue #Don't update with bounds from infeasible children
-            seen = True
-            if self.lowers.get(f) is None:
-                self.lowers[f] =  ChildrenBounds(True)
-            if self.uppers.get(f) is None:
-                self.uppers[f] = ChildrenBounds(False)
-            upper = min(upper, self.uppers[f].left + self.uppers[f].right + 1)
-            lower = min(lower, self.lowers[f].left + self.lowers[f].right + 1)
+            upper = min(upper, self.lefts[feature].lower + self.rights[feature].lower + 1)
+            lower = min(lower, self.lefts[feature].lower + self.rights[feature].upper + 1)
 
 
         updated = False
         if upper < self.upper:
+            if self.parent is None:
+                print("updated the best for root at some point")
+            cache.put_upper(self.df, upper)
+            #New best solution found
+            self.save_best(f)
             self.put_node_upper(upper)
+            cache.put_upper(self.df, upper)
             updated = True
         if lower > self.lower:
+            cache.put_lower(self.df, lower)
             self.put_node_lower(lower)
             updated = True
 
@@ -144,8 +176,11 @@ class Node:
         #print("Lefts and rights: ")
 
         if self.lower == self.upper:
-            self.check_ready(cache)
-            return True
+            # if self.parent is None:
+                # print("found root solution")
+            #self.save_best(f)
+            self.link_and_prune(self.best, cache)
+            return False #because link and prune already backpropagates
 
         #Prune whole branch if infeasible
         if self.lower > self.upper:
@@ -169,37 +204,20 @@ class Node:
         #     else:
         #         self.parent.lefts[self.parent_feat].cut_branches
 
-    #Duplicated code can be refactored
-    def add_child_lower(self, f, isLeft,bound):
-        if self.lowers.get(f) is None:
-            self.lowers[f] = ChildrenBounds(True)
-        if isLeft:
-            self.lowers[f].left = bound
-        else:
-            self.lowers[f].right = bound
-        #print(f"Added child lower bound: node = {str(self)}, isLeft = {isLeft}, bound = {bound}")
-
-    def add_child_upper(self, f, isLeft,bound):
-        if self.uppers.get(f) is None:
-            self.uppers[f] = ChildrenBounds(False)
-        if isLeft:
-            self.uppers[f].left = bound
-        else:
-            self.uppers[f].right = bound
-        #print(f"Added child upper bound:node = {str(self)}, isLeft = {isLeft}, bound = {bound}")
 
 
     def put_node_upper(self, bound):
         previous_upper = self.upper
         self.upper = min(self.upper, bound)
-        #if self.upper != previous_upper:
-            #print(f"Updated node upper bound:node = {str(self)}, new upper = {self.upper}")
+        # if self.upper != previous_upper:
+            # print(f"Updated node upper bound:node = {str(self)}, new upper = {self.upper}")
 
     def put_node_lower(self, bound):
+        # print("with bound =", bound)
         previous_lower = self.lower
         self.lower = max(self.lower, bound)
-        #if self.lower != previous_lower:
-            #print(f"Updated node lower bound: node = {str(self)}, new lower = {self.lower}")
+        # if self.lower != previous_lower:
+            # print(f"Updated node lower bound: node = {str(self)}, new lower = {self.lower}")
 
     # def __str__(self):
     #     return "dataset: " + str(self.df) + " parent_feat: " + str(self.parent_feat) + " is_left: " + str(self.isLeft) + " feasible: " + str(self.feasible) + " feature: " + str(self.f) + " upper: " + str(self.upper) + " lower: " + str(self.lower)

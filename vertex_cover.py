@@ -197,28 +197,6 @@ def get_features(df, cache : Cache):
         cover_features, vclb = vertex_cover_features(df)
         cache.put_vertex_cover(df, cover_features)
     return one_offs, cover_features, vclb
-
-def backpropagate(node : Node, cache : Cache):
-    print("Backpropagating")
-  
-    # if cache.get_upper(data) != 0: #Skip leaves
-    #     node.update_local_bounds(cache) #If root still check if maybe some childrent can be pruned
-    if not node.feasible:
-        return
-    if node.parent is None:
-        return
-    
-    parent = node.parent
-    f = node.parent_feat
-    
-    #Add bounds for the chid at feature f
-    #print("Propagating bounds from child")
-    parent.add_child_lower(f, node.isLeft,  node.lower)
-    parent.add_child_upper(f, node.isLeft,  node.upper)
-
-    if parent.update_local_bounds(cache, f):
-        #Backpropagate further only if bounds were updated
-        backpropagate(parent,cache)
     
    
 def print_solution(root : Node):
@@ -239,8 +217,16 @@ def computeUB(node: Node, cache: Cache):
         cart = fast_forward(data, pos_features) #Compute fast forward upper bound
         ff = cart.get_n_leaves() - 1 if cart is not None else 0
 
+
         cache.put_upper(data, ff)
         best = transformTree(0, cart.tree_, node.parent, node.isLeft)
+
+        if node.parent is None:
+            print("bound: ", ff)
+            print(export_text(cart))
+            print("transformed tree for root init: ")
+            print_solution(best)
+
         node.best = best
     node.put_node_upper(cache.get_upper(data)) #Add the dataset upper bound to the node upper bound
 
@@ -249,30 +235,22 @@ def computeLB(node: Node, cache: Cache):
     if cache.get_lower(data) is None:
         one_offs, cover_features, vclb = get_features(data, cache)
         llb = max(len(one_offs), vclb)
-        #print("Putting lower bound from vc or feats")
-        #print("one offs: ",len(one_offs) )
-        #print("vclb: ", vclb)
+        # print("Putting lower bound from vc or feats")
+        # print("cover features: ", cover_features)
+        # print("one offs: ",len(one_offs) )
+        # print("vclb: ", vclb)
         cache.put_lower(data, llb) #Add lower bound based on vertex cover and one_offs
-
+    # print("putting a lower bound")
     node.put_node_lower(cache.get_lower(data))
 
-def add_children_bounds(node : Node, left : Node, right: Node, f):
-    node.add_child_lower(f, True, left.lower)
-    node.add_child_upper(f, True, left.upper)
-    node.add_child_lower(f, False, right.lower)
-    node.add_child_upper(f, False, right.upper)
-
-    if(left.lower + right.lower + 1 > node.upper):
-        return False
-
-    return True
 
 def mark_leaf(node : Node, cache : Cache):
+    print("found leaf")
     cache.put_lower(node.df, 0)
     node.put_node_lower(0)
     node.put_node_upper(0)
     cache.put_upper(node.df, 0)
-    backpropagate(node, cache) #Backpropagate the bounds for the found leaf node
+    node.backpropagate(cache) #Backpropagate the bounds for the found leaf node
     node.mark_ready(cache) #Mark solution found for subproblem
 
 def solve(df):
@@ -282,8 +260,8 @@ def solve(df):
     pos_features = possible_features(df, cache)
     cart = fast_forward(df, pos_features)
     max_nodes = cart.get_n_leaves() - 1
-    # print(export_text(cart))
-    # print("transformed tree: ", print_solution(transformTree(0,cart.tree_,None,None)))
+    #print("max nodes: ", max_nodes)
+   
     search_space = len(pos_features)**max_nodes
     explored = 0
     
@@ -304,16 +282,13 @@ def solve(df):
         data = root.df
         solution =cache.get_solution(data) #Check if solution already found
         if solution is not None:
-            #print("Solution already existing in cache: ", str(solution))
+            print("Solution already existing in cache: ", str(solution))
             root.link_and_prune(solution, cache)
             continue
        
 
-        if check_leaf(data):
-            mark_leaf(root, cache)
-            continue
-        else:
-            cache.put_lower(data, 1) #Lower bound of 1 if it's not a pure node
+        root.put_node_lower(0)
+        cache.put_lower(data, 1) #Lower bound of 1 if it's not a pure node
 
         explored += 1 #Only updated explored nodes if not a leaf and not in cache
 
@@ -328,8 +303,7 @@ def solve(df):
             #root.put_node_upper(pub) #Add the upper bound coming from the parent just for the node
 
         #Backpropagate the bounds
-        backpropagate(root, cache)
-
+        root.backpropagate(cache)
         if not root.feasible: #Stop if bounds are not looking good
             #print("Node became infeasible after backpropagation, skipping.")
             continue
@@ -359,7 +333,7 @@ def solve(df):
                 computeUB(right, cache)
                 computeLB(right, cache)
 
-            if not add_children_bounds(root, left, right, i):
+            if left.lower + right.lower + 1 > root.upper:
                 left.feasible = False
                 right.feasible = False
                 continue
@@ -385,6 +359,9 @@ def solve(df):
     print("Search space is:",search_space)
     print("Only explored:", explored)
     print("Percentage of search space pruned:",(search_space-explored)/search_space*100)
+    # print("best for root:")
+    # print_solution(first.best)
+    print("final tree:")
     print_solution(first)
     # for x in list:
     #     print(x)

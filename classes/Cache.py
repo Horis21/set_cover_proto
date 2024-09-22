@@ -17,13 +17,13 @@ class Cache:
         self.possible_feats[hashable(df)] = feats
 
     def get_one_offs(self, df):
-        return self.one_off.get(hashable(df), {})
+        return self.one_off.get(hashable(df))
     
     def put_one_offs(self, df, one_offs):
          self.one_off[hashable(df)] = one_offs
 
     def get_vertex_cover(self, df):
-        return self.vertex_cover.get(hashable(df), {})
+        return self.vertex_cover.get(hashable(df))
     
     def put_vertex_cover(self, df, vertex_cover):
          self.vertex_cover[hashable(df)] = vertex_cover
