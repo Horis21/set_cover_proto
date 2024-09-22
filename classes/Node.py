@@ -1,3 +1,4 @@
+import queue
 from classes.ChildrenReady import ChildrenReady
 from classes.Cache import Cache
 import copy
@@ -91,6 +92,9 @@ class Node:
         # if not self.feasible:
         #     return
 
+        # print(self.df, "is solve with:")
+        # self.print_solution()
+
         cache.put_solution(self.df, self)
         if self.parent is None:
             return
@@ -125,9 +129,6 @@ class Node:
         self.best = best
 
     def update_local_bounds(self, cache : Cache, f):
-
-        if self.parent is None:
-            print("Current root bounds in update local bounds: ", self.lower, "and", self.upper)
 
         #Prune subbranch if children pair is infeasible
         if self.lefts.get(f) is not None and self.rights.get(f) is not None and (not self.lefts[f].feasible or not self.rights[f].feasible or self.lefts[f].lower + self.rights[f].lower + 1 > self.upper):
@@ -176,8 +177,8 @@ class Node:
         #print("Lefts and rights: ")
 
         if self.lower == self.upper:
-            # if self.parent is None:
-                # print("found root solution")
+            if self.parent is None:
+                print("found root solution")
             #self.save_best(f)
             self.link_and_prune(self.best, cache)
             return True #because link and prune already backpropagates
@@ -206,18 +207,29 @@ class Node:
 
 
 
+    def print_solution(self):
+        q = queue.Queue()
+        q.put(self)
+        while not q.empty():
+            node = q.get()
+            print(node.f)
+            if node.left is not None:
+                q.put(node.left)
+            if node.right is not None:
+                q.put(node.right)
+
     def put_node_upper(self, bound):
         previous_upper = self.upper
         self.upper = min(self.upper, bound)
-        if self.upper != previous_upper:
-            print(f"Updated node upper bound:node = {str(self)}, new upper = {self.upper}")
+        # if self.upper != previous_upper:
+        #     print(f"Updated node upper bound:node = {str(self)}, new upper = {self.upper}")
 
     def put_node_lower(self, bound):
         # print("with bound =", bound)
         previous_lower = self.lower
         self.lower = max(self.lower, bound)
-        if self.lower != previous_lower:
-            print(f"Updated node lower bound: node = {str(self)}, new lower = {self.lower}")
+        # if self.lower != previous_lower:
+        #     print(f"Updated node lower bound: node = {str(self)}, new lower = {self.lower}")
 
     # def __str__(self):
     #     return "dataset: " + str(self.df) + " parent_feat: " + str(self.parent_feat) + " is_left: " + str(self.isLeft) + " feasible: " + str(self.feasible) + " feature: " + str(self.f) + " upper: " + str(self.upper) + " lower: " + str(self.lower)

@@ -8,7 +8,6 @@ from sklearn.tree import export_text
 from classes.Node import Node
 from classes.Cache import Cache
 import sys
-import copy
 
 def get_difference_table(df):
     # Split positive and negative instances (column 0 is the label)
@@ -156,11 +155,11 @@ def transformTree(node_id, tree, parent=None, isLeft = None):
     return new_node
 
 #Fast forward upper bound of a dataset
-def fast_forward(df, pos_features):
+def fast_forward(df):
     if check_leaf(df):
         return None
     else:
-        X = df[df.columns[[f + 1 for f in pos_features]]]
+        X = df[df.columns[1:]]
         cart = DecisionTreeClassifier()
         cart.fit(X, df[0])
         return cart
@@ -198,23 +197,12 @@ def get_features(df, cache : Cache):
         cache.put_vertex_cover(df, cover_features)
     return one_offs, cover_features, vclb
     
-   
-def print_solution(root : Node):
-    q = queue.Queue()
-    q.put(root)
-    while not q.empty():
-        node = q.get()
-        print(node.f)
-        if node.left is not None:
-            q.put(node.left)
-        if node.right is not None:
-            q.put(node.right)
 
 def computeUB(node: Node, cache: Cache):
     data = node.df
     pos_features = possible_features(data, cache)
     if cache.get_upper(data) is None:
-        cart = fast_forward(data, pos_features) #Compute fast forward upper bound
+        cart = fast_forward(data) #Compute fast forward upper bound
         ff = cart.get_n_leaves() - 1 if cart is not None else 0
 
 
@@ -225,7 +213,12 @@ def computeUB(node: Node, cache: Cache):
             print("bound: ", ff)
             print(export_text(cart))
             print("transformed tree for root init: ")
-            print_solution(best)
+            best.print_solution()
+
+        # print("best for: ", node,"dataset:", node.df, "is:")
+        # best.print_solution()
+        # print("from transformed from:")
+        # print(export_text(cart))
 
         node.best = best
     node.put_node_upper(cache.get_upper(data)) #Add the dataset upper bound to the node upper bound
@@ -258,7 +251,7 @@ def solve(df):
     pq = queue.PriorityQueue()
 
     pos_features = possible_features(df, cache)
-    cart = fast_forward(df, pos_features)
+    cart = fast_forward(df)
     max_nodes = cart.get_n_leaves() - 1
     #print("max nodes: ", max_nodes)
    
@@ -272,7 +265,6 @@ def solve(df):
     computeUB(first,cache)
     list = []
     while not pq.empty():
-        print("Current root bounds in main loop: ", first.lower, "and", first.upper)
         root = pq.get()[1]
         list.append(root)
         print("Looking at node: ", root)
@@ -365,7 +357,7 @@ def solve(df):
     # print("best for root:")
     # print_solution(first.best)
     print("final tree:")
-    print_solution(first)
+    first.print_solution()
     # for x in list:
     #     print(x)
     # for f in range(2):
