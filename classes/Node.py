@@ -50,20 +50,17 @@ class Node:
 
         self.feasible = True #Sanity check hehe
 
-        self.prune_siblings(cache)
+        self.prune_solution_siblings(cache)
         self.backpropagate(cache)
         self.mark_ready(cache)
 
-    def prune_siblings(self, cache : Cache):
-        parent = self.parent
-
-        if parent is None:
-            return
-        
-        for feat in cache.get_possbile_feats(parent.df):
-            if feat != self.parent_feat:
-                parent.lefts[feat].cut_branches()
-                parent.rights[feat].cut_branches()
+    def prune_solution_siblings(self, cache : Cache):
+        for feat in cache.get_possbile_feats(self.df):
+            if feat != self.f:
+                if self.lefts.get(feat) is not None:
+                    self.lefts[feat].cut_branches()
+                if self.rights.get(feat) is not None:
+                    self.rights[feat].cut_branches()
 
     
     def check_ready(self, cache : Cache):
@@ -85,7 +82,7 @@ class Node:
                 self.mark_ready(cache)
               
                 if self.parent is not None:
-                    self.prune_siblings(cache)
+                    self.prune_solution_siblings(cache)
                 
                 return
             
