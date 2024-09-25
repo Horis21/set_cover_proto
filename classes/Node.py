@@ -61,6 +61,14 @@ class Node:
                 if self.rights.get(feat) is not None:
                     self.rights[feat].cut_branches()
 
+    def prune_infeasible_children(self, cache : Cache):
+        #Prune subbranch if children pair is infeasible
+        pos_features = cache.get_possbile_feats(self.df)
+        for f in pos_features:
+            if self.lefts.get(f) is not None and self.rights.get(f) is not None and self.lefts[f].lower + self.rights[f].lower + 1 > self.upper:
+                self.lefts.get(f).cut_branches()
+                self.lefts.get(f).cut_branches()
+
     
     def check_ready(self, cache : Cache):
 
@@ -163,6 +171,7 @@ class Node:
             self.save_best(f)
             self.put_node_upper(childrenUpper)
             cache.put_upper(self.df, childrenUpper)
+            self.prune_infeasible_children(cache) #Since UB has been updated it is possible that some children are now infeasible because of their LBs
             updated = True
         if childrenLower > self.lower:
             cache.put_lower(self.df, childrenLower)
