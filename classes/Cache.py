@@ -9,6 +9,10 @@ class Cache:
         self.one_off = {}
         self.vertex_cover = {}
         self.possible_feats = {}
+        self.bests = {}
+
+    def get_best(self, df):
+        return self.bests.get(hashable(df))
 
     def get_possbile_feats(self, df):
         return self.possible_feats.get(hashable(df))
@@ -18,6 +22,9 @@ class Cache:
 
     def get_one_offs(self, df):
         return self.one_off.get(hashable(df))
+    
+    def put_best(self, df, best):
+         self.bests[hashable(df)] = best
     
     def put_one_offs(self, df, one_offs):
          self.one_off[hashable(df)] = one_offs

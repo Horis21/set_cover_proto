@@ -169,6 +169,7 @@ class Node:
             cache.put_upper(self.df, childrenUpper)
             #New best solution found
             self.save_best(f)
+            cache.put_best(self.df, self.best)
             self.put_node_upper(childrenUpper)
             cache.put_upper(self.df, childrenUpper)
             self.prune_infeasible_children(cache) #Since UB has been updated it is possible that some children are now infeasible because of their LBs

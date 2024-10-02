@@ -208,6 +208,7 @@ def computeUB(node: Node, cache: Cache):
 
         cache.put_upper(data, ff)
         best = transformTree(0, cart.tree_, node.parent, node.isLeft)
+        cache.put_best(data, best)
 
         if node.parent is None:
             print("bound: ", ff)
@@ -222,6 +223,7 @@ def computeUB(node: Node, cache: Cache):
 
         node.best = best
     node.put_node_upper(cache.get_upper(data)) #Add the dataset upper bound to the node upper bound
+    node.best = cache.get_best(data)
 
 def computeLB(node: Node, cache: Cache):
     data = node.df     
