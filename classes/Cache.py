@@ -54,6 +54,8 @@ class Cache:
         return self.upper.get(hashable(df))
     
     def put_upper(self, df, bound):
-         upper = self.get_upper(df)
-         if upper is None or upper > bound:
+        upper = self.get_upper(df)
+        if upper is None or upper > bound:
               self.upper[hashable(df)] = bound
+              return True
+        return False

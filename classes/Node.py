@@ -96,13 +96,6 @@ class Node:
         
     #Mark subproblem solved
     def mark_ready(self, cache : Cache):
-        # self.cut_branches()
-        # if not self.feasible:
-        #     return
-
-        # print(self.df, "is solve with:")
-        # self.print_solution()
-
         cache.put_solution(self.df, self)
         if self.parent is None:
             return
@@ -169,9 +162,9 @@ class Node:
             cache.put_upper(self.df, childrenUpper)
             #New best solution found
             self.save_best(f)
-            cache.put_best(self.df, self.best)
             self.put_node_upper(childrenUpper)
-            cache.put_upper(self.df, childrenUpper)
+            if cache.put_upper(self.df, childrenUpper):
+                cache.put_best(self.df, self.best) # Only if it's better than that we have in the cache
             self.prune_infeasible_children(cache) #Since UB has been updated it is possible that some children are now infeasible because of their LBs
             updated = True
         if childrenLower > self.lower:
@@ -222,7 +215,7 @@ class Node:
         q.put(self)
         while not q.empty():
             node = q.get()
-            print(node.f)
+            print(node)
             if node.left is not None:
                 q.put(node.left)
             if node.right is not None:

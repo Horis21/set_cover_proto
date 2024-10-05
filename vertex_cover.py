@@ -137,6 +137,8 @@ def transformTree(node_id, tree, parent=None, isLeft = None):
         feature = tree.feature[node_id]
         new_node = Node(df = None, parent_feat = None, parent=parent, isLeft = isLeft)
         new_node.f = feature
+        if parent is not None:
+            new_node.parent_feat = parent.f
         
         # Recursively create left and right children
         left_child = transformTree(tree.children_left[node_id],tree ,new_node, True)
@@ -224,6 +226,7 @@ def computeUB(node: Node, cache: Cache):
         node.best = best
     node.put_node_upper(cache.get_upper(data)) #Add the dataset upper bound to the node upper bound
     node.best = cache.get_best(data)
+    node.best.parent_feat = node.parent_feat
 
 def computeLB(node: Node, cache: Cache):
     data = node.df     
@@ -371,8 +374,8 @@ def solve(df):
 
 if __name__ == "__main__":
     #df = pd.read_csv("anneal.csv", sep=" ", header=None)
-    #df = pd.read_csv("monk3_bin.csv", sep=" ", header=None)
-    df = pd.read_csv("test.csv", sep=" ", header=None)
+    df = pd.read_csv("monk3_bin.csv", sep=" ", header=None)
+    #df = pd.read_csv("test.csv", sep=" ", header=None)
     #print("vertex_cover_features: ", vertex_cover_features(df))
     #print("of-by-one feature: ", one_off_features(df))
 
