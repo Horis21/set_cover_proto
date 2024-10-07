@@ -46,7 +46,6 @@ class Node:
         self.right = solution.right
         
         self.f = solution.f
-
         self.feasible = True #Sanity check hehe
 
         self.prune_solution_siblings(cache)
@@ -96,6 +95,7 @@ class Node:
         
     #Mark subproblem solved
     def mark_ready(self, cache : Cache):
+        self.best = self
         cache.put_solution(self.df, self)
         if self.parent is None:
             return
@@ -175,6 +175,7 @@ class Node:
         if self.lower == self.upper:
             if self.parent is None:
                 print("found root solution")
+                self.cut_branches() # Found solution no need to search anymore
             #self.save_best(f)
             self.link_and_prune(self.best, cache)
             return True #because link and prune already backpropagates but otherwise infinite loop ?

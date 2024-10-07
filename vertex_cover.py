@@ -86,8 +86,6 @@ def vertex_cover_features(df):
 
         # print the final lower bound
         #print(f"Require at least {lower_bound} features")
-        print("besr_cover: ", best_cover)
-        print("lower_bound: ", lower_bound)
         return best_cover, lower_bound
     
 
@@ -378,8 +376,8 @@ def solve(df):
 
 
 if __name__ == "__main__":
-    #df = pd.read_csv("anneal.csv", sep=" ", header=None)
-    df = pd.read_csv("monk3_bin.csv", sep=" ", header=None)
+    df = pd.read_csv("anneal.csv", sep=" ", header=None)
+    #df = pd.read_csv("monk3_bin.csv", sep=" ", header=None)
     #df = pd.read_csv("test.csv", sep=" ", header=None)
     #print("vertex_cover_features: ", vertex_cover_features(df))
     #print("of-by-one feature: ", one_off_features(df))
