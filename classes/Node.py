@@ -208,7 +208,7 @@ class Node:
         q.put(self)
         while not q.empty():
             node = q.get()
-            print(node.f)
+            print(node)
             if node.left is not None:
                 q.put(node.left)
             if node.right is not None:

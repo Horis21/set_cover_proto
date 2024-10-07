@@ -148,6 +148,9 @@ def transformTree(node_id, tree, parent=None, isLeft = None):
         left_child = transformTree(tree.children_left[node_id],tree ,new_node, True)
         right_child = transformTree(tree.children_right[node_id],tree, new_node, False)
 
+        left_child.parent_feat = feature
+        right_child.parent_feat = feature
+
         left_child.isLeft = True
         right_child.isLeft = False
         
@@ -156,7 +159,7 @@ def transformTree(node_id, tree, parent=None, isLeft = None):
         new_node.right = right_child
 
     else:  # It's a leaf node
-        new_node = Node(df = None, parent_feat = None, parent= parent, isLeft = isLeft)
+        new_node = Node(df = None, parent_feat = parent.f, parent= parent, isLeft = isLeft)
     
     return new_node
 
@@ -252,6 +255,7 @@ def mark_leaf(node : Node, cache : Cache):
     node.put_node_lower(0)
     node.put_node_upper(0)
     cache.put_upper(node.df, 0)
+    node.best = Node(node.df, node.parent_feat, node.parent, node.isLeft)
     #node.backpropagate(cache) #Backpropagate the bounds for the found leaf node
     node.mark_ready(cache) #Mark solution found for subproblem
 
@@ -375,8 +379,8 @@ def solve(df):
 
 if __name__ == "__main__":
     #df = pd.read_csv("anneal.csv", sep=" ", header=None)
-    #df = pd.read_csv("monk3_bin.csv", sep=" ", header=None)
-    df = pd.read_csv("test.csv", sep=" ", header=None)
+    df = pd.read_csv("monk3_bin.csv", sep=" ", header=None)
+    #df = pd.read_csv("test.csv", sep=" ", header=None)
     #print("vertex_cover_features: ", vertex_cover_features(df))
     #print("of-by-one feature: ", one_off_features(df))
 
