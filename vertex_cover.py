@@ -291,7 +291,7 @@ def solve(df):
             continue
        
 
-        root.put_node_lower(0)
+        root.put_node_lower(1)
         cache.put_lower(data, 1) #Lower bound of 1 if it's not a pure node
 
         explored += 1 #Only updated explored nodes if not a leaf and not in cache
@@ -302,15 +302,11 @@ def solve(df):
         
         #print("Dataset lower bound: ", cache.get_lower(data))
 
-        if root.parent is not None:
-            pub = root.parent.upper - 1
-            #root.put_node_upper(pub) #Add the upper bound coming from the parent just for the node
-
         #Backpropagate the bounds
-        root.backpropagate(cache)
-        if not root.feasible: #Stop if bounds are not looking good
-            #print("Node became infeasible after backpropagation, skipping.")
-            continue
+        # root.backpropagate(cache)
+        # if not root.feasible: #Stop if bounds are not looking good
+        #     #print("Node became infeasible after backpropagation, skipping.")
+        #     continue
         
         #Get the features needed for computing priority
         one_offs, cover_features, vclb = get_features(data, cache)
