@@ -138,8 +138,6 @@ class Node:
         #This could be optimized in a future versions by checking if bounds for all childs have been added and only checking 
         # if the bound for the feature we are updating is changing the bound for the whole node
         for feature in pos_features:
-            if self.lefts.get(feature) is None or not self.lefts[feature].feasible or self.rights.get(feature) is None or not self.rights[feature].feasible:
-                continue #Don't update with bounds from infeasible children
             upperBound =  self.lefts[feature].lower + self.rights[feature].lower + 1
             if upperBound < childrenUpper:
                 childrenUpper = upperBound
@@ -210,7 +208,7 @@ class Node:
         q.put(self)
         while not q.empty():
             node = q.get()
-            print(node)
+            print(node.f)
             if node.left is not None:
                 q.put(node.left)
             if node.right is not None:

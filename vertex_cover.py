@@ -70,7 +70,9 @@ def vertex_cover_features(df):
             diff_table = get_difference_table(sample)
             features = find_vertex_cover(diff_table, verbose=False)
             # the lower bound is the maximum of all the lower bounds we have obtained
-            lower_bound = max(lower_bound, len(features))
+            if len(features) > lower_bound:
+                lower_bound = len(features)
+                best_cover = features
             #print(f"Iteration {i+1} resulting features: {features}")
             # Count the features used. 
             for f in features:
@@ -78,13 +80,15 @@ def vertex_cover_features(df):
         
         # print the features in order of importance
         feature_order = np.argsort(counts)[::-1]
-        for f in feature_order:
-            if counts[f] == 0: break
+        # for f in feature_order:
+        #     if counts[f] == 0: break
             #print(f"Feature {f}: required {counts[f]} times")
 
         # print the final lower bound
         #print(f"Require at least {lower_bound} features")
-        return feature_order, lower_bound
+        print("besr_cover: ", best_cover)
+        print("lower_bound: ", lower_bound)
+        return best_cover, lower_bound
     
 
     
@@ -248,7 +252,7 @@ def mark_leaf(node : Node, cache : Cache):
     node.put_node_lower(0)
     node.put_node_upper(0)
     cache.put_upper(node.df, 0)
-    node.backpropagate(cache) #Backpropagate the bounds for the found leaf node
+    #node.backpropagate(cache) #Backpropagate the bounds for the found leaf node
     node.mark_ready(cache) #Mark solution found for subproblem
 
 def solve(df):
@@ -333,13 +337,13 @@ def solve(df):
                 computeUB(right, cache)
                 computeLB(right, cache)
 
+            root.lefts[i] = left
+            root.rights[i] = right
+
             if left.lower + right.lower + 1 > root.upper:
                 left.feasible = False
                 right.feasible = False
                 continue
-
-            root.lefts[i] = left
-            root.rights[i] = right
 
             if right_flag and left_flag:
                 continue
@@ -355,6 +359,7 @@ def solve(df):
                 pq.put((priority, left))
             if not right_flag:
                 pq.put((priority, right))
+        root.update_local_bounds(cache)
     print("done")
     print("Search space is:",search_space)
     print("Only explored:", explored)
@@ -374,8 +379,8 @@ def solve(df):
 
 if __name__ == "__main__":
     #df = pd.read_csv("anneal.csv", sep=" ", header=None)
-    df = pd.read_csv("monk3_bin.csv", sep=" ", header=None)
-    #df = pd.read_csv("test.csv", sep=" ", header=None)
+    #df = pd.read_csv("monk3_bin.csv", sep=" ", header=None)
+    df = pd.read_csv("test.csv", sep=" ", header=None)
     #print("vertex_cover_features: ", vertex_cover_features(df))
     #print("of-by-one feature: ", one_off_features(df))
 
