@@ -25,15 +25,11 @@ class Node:
         print("Backpropagating")
         if not self.feasible:
             return
-        if self.parent is None:
-            return
         
-        parent = self.parent
-        f = self.parent_feat
+        if self.update_local_bounds(cache) and self.parent is not None:
+             parent = self.parent
+             parent.backpropagate(cache) #Backpropagate further only if bounds were updated
 
-        if parent.update_local_bounds(cache):
-            #Backpropagate further only if bounds were updated
-            parent.backpropagate(cache)
 
     def link_and_prune(self, solution, cache : Cache):
         if solution.lower > self.upper:
@@ -50,7 +46,8 @@ class Node:
         # self.feasible = True #Sanity check hehe
 
         self.prune_solution_siblings(cache)
-        self.backpropagate(cache)
+        if self.parent is not None:
+            self.parent.backpropagate(cache)
         self.mark_ready(cache)
         self.cut_branches() # Found solution no need to search anymore
 

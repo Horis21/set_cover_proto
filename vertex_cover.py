@@ -220,7 +220,7 @@ def computeUB(node: Node, cache: Cache):
         if node.parent is None:
             print("bound: ", ff)
             print(export_text(cart))
-            print("transformed tree for root init: ")
+            print("transformed tree for node init: ")
             best.print_solution()
 
         # print("best for: ", node,"dataset:", node.df, "is:")
@@ -254,7 +254,6 @@ def mark_leaf(node : Node, cache : Cache):
     node.put_node_upper(0)
     cache.put_upper(node.df, 0)
     node.best = Node(node.df, node.parent_feat, node.parent, node.isLeft)
-    #node.backpropagate(cache) #Backpropagate the bounds for the found leaf node
     node.mark_ready(cache) #Mark solution found for subproblem
 
 def solve(df):
@@ -269,31 +268,31 @@ def solve(df):
     search_space = len(pos_features)**max_nodes
     explored = 0
     
-    first = Node(df, None, None, None)
+    root = Node(df, None, None, None)
     #Add the root
-    pq.put((1, first))
-    computeLB(first,cache)
-    computeUB(first,cache)
+    pq.put((1, root))
+    computeLB(root,cache)
+    computeUB(root,cache)
     list = []
     while not pq.empty():
-        root = pq.get()[1]
-        list.append(root)
-        print("Looking at node: ", root)
-        if not root.feasible: 
+        node = pq.get()[1]
+        list.append(node)
+        print("Looking at node: ", node)
+        if not node.feasible: 
             #print("Node is not feasible, skipping.")
             continue #Skip nodes deemed unfeasible
 
-        data = root.df
+        data = node.df
         solution =cache.get_solution(data) #Check if solution already found
         if solution is not None:
             print("Solution already existing in cache: ", str(solution))
-            root.link_and_prune(solution, cache)
-            root.lower = solution.lower
-            root.upper = solution.upper
+            node.link_and_prune(solution, cache)
+            node.lower = solution.lower
+            node.upper = solution.upper
             continue
        
 
-        root.put_node_lower(1)
+        node.put_node_lower(1)
         cache.put_lower(data, 1) #Lower bound of 1 if it's not a pure node
 
         explored += 1 #Only updated explored nodes if not a leaf and not in cache
@@ -303,12 +302,6 @@ def solve(df):
 
         
         #print("Dataset lower bound: ", cache.get_lower(data))
-
-        #Backpropagate the bounds
-        # root.backpropagate(cache)
-        # if not root.feasible: #Stop if bounds are not looking good
-        #     #print("Node became infeasible after backpropagation, skipping.")
-        #     continue
         
         #Get the features needed for computing priority
         one_offs, cover_features, vclb = get_features(data, cache)
@@ -318,8 +311,8 @@ def solve(df):
             #Split the data based on feature i
             left_df, right_df = split(data, i)
            
-            left = Node(left_df, i, root, True)
-            right = Node(right_df, i, root, False)
+            left = Node(left_df, i, node, True)
+            right = Node(right_df, i, node, False)
 
             left_flag = check_leaf(left_df)
             right_flag = check_leaf(right_df)
@@ -335,10 +328,10 @@ def solve(df):
                 computeUB(right, cache)
                 computeLB(right, cache)
 
-            root.lefts[i] = left
-            root.rights[i] = right
+            node.lefts[i] = left
+            node.rights[i] = right
 
-            if left.lower + right.lower + 1 > root.upper:
+            if left.lower + right.lower + 1 > node.upper:
                 left.feasible = False
                 right.feasible = False
                 continue
@@ -357,28 +350,20 @@ def solve(df):
                 pq.put((priority, left))
             if not right_flag:
                 pq.put((priority, right))
-        root.update_local_bounds(cache)
+        node.backpropagate(cache)
+
     print("done")
     print("Search space is:",search_space)
     print("Only explored:", explored)
     print("Percentage of search space pruned:",(search_space-explored)/search_space*100)
-    # print("best for root:")
-    # print_solution(first.best)
     print("final tree:")
-    first.print_solution()
-    # for x in list:
-    #     print(x)
-    # for f in range(2):
-    #     print(first.solutions[f].left, " ", first.solutions[f].right)
 
-    # for f in range(2):
-    #     print(first.lefts[f].feasible, " ", first.rights[f].feasible)
-
+    root.print_solution()
 
 if __name__ == "__main__":
     #df = pd.read_csv("anneal.csv", sep=" ", header=None)
-    df = pd.read_csv("monk3_bin.csv", sep=" ", header=None)
-    #df = pd.read_csv("test.csv", sep=" ", header=None)
+    #df = pd.read_csv("monk3_bin.csv", sep=" ", header=None)
+    df = pd.read_csv("test.csv", sep=" ", header=None)
     #print("vertex_cover_features: ", vertex_cover_features(df))
     #print("of-by-one feature: ", one_off_features(df))
 
