@@ -248,7 +248,6 @@ def computeLB(node: Node, cache: Cache):
 
 
 def mark_leaf(node : Node, cache : Cache):
-    print("found leaf")
     cache.put_lower(node.df, 0)
     node.put_node_lower(0)
     node.put_node_upper(0)
@@ -361,8 +360,8 @@ def solve(df):
     root.print_solution()
 
 if __name__ == "__main__":
-    df = pd.read_csv("anneal.csv", sep=" ", header=None)
-    #df = pd.read_csv("monk3_bin.csv", sep=" ", header=None)
+    #df = pd.read_csv("anneal.csv", sep=" ", header=None)
+    df = pd.read_csv("monk3_bin.csv", sep=" ", header=None)
     #df = pd.read_csv("test.csv", sep=" ", header=None)
     #print("vertex_cover_features: ", vertex_cover_features(df))
     #print("of-by-one feature: ", one_off_features(df))

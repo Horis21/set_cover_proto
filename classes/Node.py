@@ -93,7 +93,7 @@ class Node:
         #This could be optimized in a future versions by checking if bounds for all childs have been added and only checking 
         # if the bound for the feature we are updating is changing the bound for the whole node
         for feature in pos_features:
-            upperBound =  self.lefts[feature].lower + self.rights[feature].lower + 1
+            upperBound =  self.lefts[feature].upper + self.rights[feature].upper + 1
             if upperBound < childrenUpper:
                 childrenUpper = upperBound
                 self.best_f = feature
@@ -133,6 +133,7 @@ class Node:
                 #self.cut_branches() # Found solution no need to search anymore
             self.link_and_prune(self.best, cache)
             self.mark_ready(cache)
+            self.cut_branches() # Found solution no need to search anymore
             return True #because link and prune already backpropagates but otherwise infinite loop ?
 
         #Prune whole branch if infeasible
