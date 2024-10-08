@@ -14,6 +14,7 @@ class Node:
         self.feasible = True
         self.solutions = {}
         self.lefts = {}
+        self.best_f = None
         self.rights = {}
         self.best = None
         self.left = None
@@ -46,11 +47,12 @@ class Node:
         self.right = solution.right
         
         self.f = solution.f
-        self.feasible = True #Sanity check hehe
+        # self.feasible = True #Sanity check hehe
 
         self.prune_solution_siblings(cache)
         self.backpropagate(cache)
         self.mark_ready(cache)
+        self.cut_branches() # Found solution no need to search anymore
 
     def prune_solution_siblings(self, cache : Cache):
         for feat in cache.get_possbile_feats(self.df):
@@ -141,7 +143,7 @@ class Node:
             upperBound =  self.lefts[feature].lower + self.rights[feature].lower + 1
             if upperBound < childrenUpper:
                 childrenUpper = upperBound
-                f = feature
+                self.best_f = feature
             childrenLower = min(childrenLower, self.lefts[feature].lower + self.rights[feature].upper + 1)
 
         if childrenLower == 20000000:
@@ -153,7 +155,7 @@ class Node:
                 print("updated the best for root at some point")
             cache.put_upper(self.df, childrenUpper)
             #New best solution found
-            self.save_best(f)
+            self.save_best(self.best_f)
             self.put_node_upper(childrenUpper)
             if cache.put_upper(self.df, childrenUpper):
                 cache.put_best(self.df, self.best) # Only if it's better than that we have in the cache
@@ -175,8 +177,7 @@ class Node:
         if self.lower == self.upper:
             if self.parent is None:
                 print("found root solution")
-                self.cut_branches() # Found solution no need to search anymore
-            #self.save_best(f)
+                #self.cut_branches() # Found solution no need to search anymore
             self.link_and_prune(self.best, cache)
             return True #because link and prune already backpropagates but otherwise infinite loop ?
 
