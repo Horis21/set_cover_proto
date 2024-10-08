@@ -11,7 +11,6 @@ class Node:
         self.upper = 20000000
         self.lower = 0
         self.feasible = True
-        self.solutions = {}
         self.lefts = {}
         self.best_f = None
         self.rights = {}
