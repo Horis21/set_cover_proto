@@ -31,7 +31,7 @@ class Node:
 
     def link_and_prune(self, solution, cache : Cache):
         if solution.lower > self.upper:
-            # print("wrongfully linked")
+            print("wrongfully linked")
             self.cut_branches()
             return
         # if self.parent is None:
@@ -41,7 +41,6 @@ class Node:
         self.right = solution.right
         
         self.f = solution.f
-        # self.feasible = True #Sanity check hehe
 
         self.prune_solution_siblings(cache)
         if self.parent is not None:
@@ -50,6 +49,8 @@ class Node:
         self.cut_branches() # Found solution no need to search anymore
 
     def prune_solution_siblings(self, cache : Cache):
+        if (self.f is None):
+            print("wtf moldova")
         for feat in cache.get_possbile_feats(self.df):
             if feat != self.f:
                 if self.lefts.get(feat) is not None:
@@ -63,7 +64,7 @@ class Node:
         for f in pos_features:
             if self.lefts.get(f) is not None and self.rights.get(f) is not None and self.lefts[f].lower + self.rights[f].lower + 1 > self.upper:
                 self.lefts.get(f).cut_branches()
-                self.lefts.get(f).cut_branches()
+                self.rights.get(f).cut_branches()
 
             
         
@@ -77,7 +78,6 @@ class Node:
     def save_best(self, f):
         best = Node(self.df, self.parent_feat, self.parent, self.isLeft)
         best.f = f
-        best.feasible = True #sanity check :()
         best.left = self.lefts[f].best
         best.right = self.rights[f].best
         best.lower = self.lower
@@ -131,13 +131,13 @@ class Node:
         if self.lower == self.upper:
             if self.parent is None:
                 print("found root solution")
-                #self.cut_branches() # Found solution no need to search anymore
             self.link_and_prune(self.best, cache)
             self.mark_ready(cache)
             return True #because link and prune already backpropagates but otherwise infinite loop ?
 
         #Prune whole branch if infeasible
         if self.lower > self.upper:
+            print("Wtf romania")
             #print(f"Pruning: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
             self.cut_branches()
             return False
@@ -152,11 +152,6 @@ class Node:
             left.cut_branches()
         for rigth in self.rights.values():
             rigth.cut_branches()
-        # if self.parent is not None:
-        #     if self.isLeft:
-        #         self.parent.rights[self.parent_feat].cut_branches
-        #     else:
-        #         self.parent.lefts[self.parent_feat].cut_branches
 
 
 
