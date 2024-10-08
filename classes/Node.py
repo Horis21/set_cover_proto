@@ -133,7 +133,6 @@ class Node:
                 #self.cut_branches() # Found solution no need to search anymore
             self.link_and_prune(self.best, cache)
             self.mark_ready(cache)
-            self.cut_branches() # Found solution no need to search anymore
             return True #because link and prune already backpropagates but otherwise infinite loop ?
 
         #Prune whole branch if infeasible
