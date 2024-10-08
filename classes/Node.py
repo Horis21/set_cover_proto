@@ -1,5 +1,4 @@
 import queue
-from classes.ChildrenReady import ChildrenReady
 from classes.Cache import Cache
 import copy
 
@@ -67,56 +66,14 @@ class Node:
                 self.lefts.get(f).cut_branches()
                 self.lefts.get(f).cut_branches()
 
-    
-    def check_ready(self, cache : Cache):
-
-        #If lower bound is not equal to upper means that there still might be better solutions out there
-        if self.lower != self.upper or not self.feasible:
-            return
-        for f in cache.get_possbile_feats(self.df):
-            if self.solutions.get(f) is None or self.lefts.get(f) is None or self.rights.get(f) is None:
-                continue
-            left = self.lefts[f]
-            right = self.rights[f]
-            #Check that both children from that branch are marked as solved and the solution can't be improved
-            if self.solutions[f].left and self.solutions[f].right and cache.get_lower(left.df) + cache.get_lower(right.df) + 1 == self.lower:
-                #print(f"Solution found: node = {str(self)}, f = {f}")
-                self.f = f
-                self.left = self.lefts[f]
-                self.right = self.rights[f]
-                self.mark_ready(cache)
-              
-                if self.parent is not None:
-                    self.prune_solution_siblings(cache)
-                
-                return
             
         
     #Mark subproblem solved
     def mark_ready(self, cache : Cache):
+
         self.best = self
         cache.put_solution(self.df, self)
-        if self.parent is None:
-            return
-        f = self.parent_feat
-        parent = self.parent
-
-        if parent.solutions.get(f) is None:
-            parent.solutions[f] = ChildrenReady()
-
-        if self.isLeft:
-            parent.solutions[f].left = True
-            if not parent.solutions[f].right and parent.rights.get(f) is not None:
-                parent.rights[f].check_ready(cache)
-        else:
-            parent.solutions[f].right = True
-            if not parent.solutions[f].left and parent.lefts.get(f) is not None:
-                parent.lefts[f].check_ready(cache)
-
-
-        #If sibling is solved as well maybe parent is also solved
-        if parent.solutions[f].left and parent.solutions[f].right:
-            parent.check_ready(cache)
+        
         
     def save_best(self, f):
         best = Node(self.df, self.parent_feat, self.parent, self.isLeft)
@@ -176,6 +133,7 @@ class Node:
                 print("found root solution")
                 #self.cut_branches() # Found solution no need to search anymore
             self.link_and_prune(self.best, cache)
+            self.mark_ready(cache)
             return True #because link and prune already backpropagates but otherwise infinite loop ?
 
         #Prune whole branch if infeasible
