@@ -96,7 +96,8 @@ class Node:
             upperBound =  self.lefts[feature].upper + self.rights[feature].upper + 1
             if upperBound < childrenUpper:
                 childrenUpper = upperBound
-                self.best_f = feature
+                if upperBound < self.upper:
+                    self.best_f = feature
             childrenLower = min(childrenLower, self.lefts[feature].lower + self.rights[feature].upper + 1)
 
         if childrenLower == 20000000:
