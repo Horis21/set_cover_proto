@@ -252,8 +252,6 @@ def mark_leaf(node : Node, cache : Cache):
     node.put_node_lower(0)
     node.put_node_upper(0)
     cache.put_upper(node.df, 0)
-    #node.backpropagate(cache) #Backpropagate the bounds for the found leaf node
-    node.mark_ready(cache) #Mark solution found for subproblem
 
 def solve(df):
     cache = Cache()
@@ -278,21 +276,18 @@ def solve(df):
         list.append(node)
         print("Looking at node: ", node)
         if not node.feasible: 
-            #print("Node is not feasible, skipping.")
+            print("Node is not feasible, skipping.")
             continue #Skip nodes deemed unfeasible
 
         data = node.df
         solution =cache.get_solution(data) #Check if solution already found
         if solution is not None:
             print("Solution already existing in cache: ", str(solution))
-            node.link_and_prune(solution, cache)
             node.lower = solution.lower
             node.upper = solution.upper
+            node.link_and_prune(solution, cache)
             continue
        
-
-        node.put_node_lower(1)
-        cache.put_lower(data, 1) #Lower bound of 1 if it's not a pure node
 
         explored += 1 #Only updated explored nodes if not a leaf and not in cache
 

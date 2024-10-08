@@ -30,33 +30,15 @@ class Node:
 
 
     def link_and_prune(self, solution, cache : Cache):
-        if solution.lower > self.upper:
-            print("wrongfully linked")
-            self.cut_branches()
-            return
-        # if self.parent is None:
-        #     print("feature for root solution: ", solution.f)
-
         self.left = solution.left
         self.right = solution.right
         
         self.f = solution.f
 
-        self.prune_solution_siblings(cache)
         if self.parent is not None:
             self.parent.backpropagate(cache)
-        self.mark_ready(cache)
         self.cut_branches() # Found solution no need to search anymore
 
-    def prune_solution_siblings(self, cache : Cache):
-        if (self.f is None):
-            print("wtf moldova")
-        for feat in cache.get_possbile_feats(self.df):
-            if feat != self.f:
-                if self.lefts.get(feat) is not None:
-                    self.lefts[feat].cut_branches()
-                if self.rights.get(feat) is not None:
-                    self.rights[feat].cut_branches()
 
     def prune_infeasible_children(self, cache : Cache):
         #Prune subbranch if children pair is infeasible
@@ -133,14 +115,6 @@ class Node:
                 print("found root solution")
             self.link_and_prune(self.best, cache)
             self.mark_ready(cache)
-            return True #because link and prune already backpropagates but otherwise infinite loop ?
-
-        #Prune whole branch if infeasible
-        if self.lower > self.upper:
-            print("Wtf romania")
-            #print(f"Pruning: node = {str(self)}, lower = {self.lower}, upper = {self.upper}")
-            self.cut_branches()
-            return False
         
         return True
 
