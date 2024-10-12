@@ -130,15 +130,22 @@ class Node:
 
 
     def print_solution(self):
+        size = 0
         q = queue.Queue()
         q.put(self)
         while not q.empty():
             node = q.get()
             print(node)
+            if node.f is None:
+                print("ok check this leaf: ")
+                print(node.df)
+            else:
+                size += 1
             if node.left is not None:
                 q.put(node.left)
             if node.right is not None:
                 q.put(node.right)
+        print("size of the tree: ", size)
 
     def put_node_upper(self, bound):
         previous_upper = self.upper
