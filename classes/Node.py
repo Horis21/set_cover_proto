@@ -58,13 +58,11 @@ class Node:
         
         
     def save_best(self, f):
-        best = Node(self.df, self.parent_feat, self.parent, self.isLeft)
-        best.f = f
-        best.left = self.lefts[f].best
-        best.right = self.rights[f].best
-        best.lower = self.lower
-        best.upper = self.upper
-        self.best = best
+        self.best.f = f
+        self.best.left = self.lefts[f].best
+        self.best.right = self.rights[f].best
+        self.best.lower = self.lower
+        self.best.upper = self.upper
 
     def update_local_bounds(self, cache : Cache):
         childrenUpper = 20000000
