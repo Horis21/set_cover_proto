@@ -253,6 +253,7 @@ def mark_leaf(node : Node, cache : Cache):
     node.put_node_lower(0)
     node.put_node_upper(0)
     cache.put_upper(node.df, 0)
+    node.mark_ready()
 
 def solve(df):
     cache = Cache()
