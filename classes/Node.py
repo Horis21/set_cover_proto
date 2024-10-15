@@ -45,7 +45,8 @@ class Node:
 
         if self.f is not None:
             self.save_best(self.f)
-
+        else:
+            self.best = self
         cache.put_solution(self.df, self)
         
         
