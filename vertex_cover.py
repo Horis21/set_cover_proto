@@ -7,6 +7,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.tree import export_text
 from classes.Node import Node
 from classes.Cache import Cache
+from classes.Cache import HashableDataFrame
 import sys
 
 def get_difference_table(df):
@@ -122,7 +123,7 @@ def one_off_features(df, cache):
 
 #Split data based on feature f
 def split(df, f):
-    return df[df[f+1] == 0], df[df[f+1]==1]
+    return HashableDataFrame(df[df[f+1] == 0]), HashableDataFrame(df[df[f+1]==1])
 
 #Check if the dataset is pure
 def check_leaf(df):
@@ -258,15 +259,12 @@ def mark_leaf(node : Node, cache : Cache):
     node.mark_ready(cache)
 
 def solve(df):
+    df = HashableDataFrame(df)
     cache = Cache()
     pq = queue.PriorityQueue()
 
-    pos_features = possible_features(df, cache)
-    cart = fast_forward(df)
-    max_nodes = cart.get_n_leaves() - 1
     #print("max nodes: ", max_nodes)
    
-    search_space = len(pos_features)**max_nodes
     explored = 0
     
     root = Node(df, None, None, None)
@@ -352,9 +350,7 @@ def solve(df):
         node.backpropagate(cache)
 
     print("done")
-    print("Search space is:",search_space)
     print("Only explored:", explored)
-    print("Percentage of search space pruned:",(search_space-explored)/search_space*100)
     print("final tree:")
 
     root.print_solution()
