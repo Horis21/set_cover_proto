@@ -9,6 +9,7 @@ class Node:
         self.isLeft = isLeft
         self.f = None
         self.upper = 20000000
+        self.improving = 20000000
         self.lower = 0
         self.feasible = True
         self.lefts = {}
@@ -37,18 +38,7 @@ class Node:
 
         if self.parent is not None:
             self.parent.backpropagate(cache)
-        self.cut_branches() # Found solution no need to search anymore
-
-
-    def prune_infeasible_children(self, cache : Cache):
-        #Prune subbranch if children pair is infeasible
-        pos_features = cache.get_possbile_feats(self.df)
-        for f in pos_features:
-            if self.lefts.get(f) is not None and self.rights.get(f) is not None and self.lefts[f].lower + self.rights[f].lower + 1 > self.upper:
-                self.lefts.get(f).cut_branches()
-                self.rights.get(f).cut_branches()
-
-            
+        self.cut_branches() # Found solution no need to search anymore            
         
     #Mark subproblem solved
     def mark_ready(self, cache : Cache):
@@ -64,21 +54,47 @@ class Node:
         self.best.lower = self.lower
         self.best.upper = self.upper
 
+    def update_improving(self):
+        if self.parent is None:
+            return 
+        parent = self.parent
+
+        f = self.parent_feat
+        if self.isLeft:
+            sibling = parent.rights[f]
+        else:
+            sibling = parent.lefts[f]
+
+        self.improving = min(self.improving, parent.improving - sibling.lower)
+
     def update_local_bounds(self, cache : Cache):
         childrenUpper = 20000000
         childrenLower = 20000000
 
+        self.update_improving()
 
         pos_features = cache.get_possbile_feats(self.df)
         #This could be optimized in a future versions by checking if bounds for all childs have been added and only checking 
         # if the bound for the feature we are updating is changing the bound for the whole node
         for feature in pos_features:
-            upperBound =  self.lefts[feature].upper + self.rights[feature].upper + 1
+            left = self.lefts[feature]
+            right =  self.rights[feature]
+
+            upperBound = left.upper + right.upper + 1
             if upperBound < childrenUpper:
                 childrenUpper = upperBound
                 if upperBound < self.upper:
                     self.best_f = feature
-            childrenLower = min(childrenLower, self.lefts[feature].lower + self.rights[feature].upper + 1)
+            self.improving = min(self.improving, upperBound-1)
+
+            lowerBound = left.lower + right.upper + 1
+
+            #Prune infeasible children pair
+            if lowerBound > self.improving:
+                left.cut_branches()
+                right.cut_branches()
+
+            childrenLower = min(childrenLower, lowerBound)
 
         if childrenLower == 20000000:
             childrenLower = 0 #Lower bound is 0 if no feasible childrent have been yet created
@@ -93,7 +109,6 @@ class Node:
             self.put_node_upper(childrenUpper)
             if cache.put_upper(self.df, childrenUpper):
                 cache.put_best(self.df, self.best) # Only if it's better than that we have in the cache
-            self.prune_infeasible_children(cache) #Since UB has been updated it is possible that some children are now infeasible because of their LBs
             updated = True
 
         if childrenLower > self.lower:
@@ -140,6 +155,7 @@ class Node:
 
     def put_node_upper(self, bound):
         previous_upper = self.upper
+        self.improving = min(self.improving, bound-1)
         self.upper = min(self.upper, bound)
         # if self.upper != previous_upper:
         #     print(f"Updated node upper bound:node = {str(self)}, new upper = {self.upper}")

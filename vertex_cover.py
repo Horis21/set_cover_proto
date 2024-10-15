@@ -286,6 +286,7 @@ def solve(df):
             print("Solution already existing in cache: ", str(solution))
             node.lower = solution.lower
             node.upper = solution.upper
+            node.improving = solution.improving
             node.link_and_prune(solution, cache)
             continue
        
