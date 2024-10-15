@@ -279,19 +279,8 @@ def solve(df):
         node = pq.get()[1]
         list.append(node)
         print("Looking at node: ", node)
-        if not node.feasible: 
-            print("Node is not feasible, skipping.")
-            continue #Skip nodes deemed unfeasible
 
         data = node.df
-        solution =cache.get_solution(data) #Check if solution already found
-        if solution is not None:
-            print("Solution already existing in cache: ", str(solution))
-            node.lower = solution.lower
-            node.upper = solution.upper
-            node.improving = solution.improving
-            node.link_and_prune(solution, cache)
-            continue
        
 
         explored += 1 #Only updated explored nodes if not a leaf and not in cache
@@ -346,9 +335,9 @@ def solve(df):
                 priority -= 1  # Vertex cover feature is only highly likely to be present
 
             if not left_flag:
-                pq.put((priority, left))
+                pq.put((1, left))
             if not right_flag:
-                pq.put((priority, right))
+                pq.put((1, right))
         node.backpropagate(cache)
 
     print("done")
