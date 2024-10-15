@@ -175,19 +175,22 @@ def possible_features(df, cache : Cache):
         features = cache.get_possbile_feats(df)
         if features is not None:
             return features
+      
         features = set([i for i in range(df.shape[1]-1)])
         features_present = np.zeros(df.shape[1]-1)
-        features_always_present = np.zeros(df.shape[1]-1)
+        features_always_present = np.ones(df.shape[1]-1)
 
         for i, row in df.iterrows():
             features_present = np.logical_or(features_present, row[1:])
             features_always_present = np.logical_and(features_always_present, row[1:])
 
         for i, f in enumerate(features_present):
-            if f == 0: features.remove(i) #Remove all features that aren't present in any instance
+            if not f: 
+                features.remove(i) #Remove all features that aren't present in any instance
 
         for i, f in enumerate(features_always_present):
-            if f == 1: features.remove(i) #Remove all features that are present in all instances
+            if f: 
+                features.remove(i) #Remove all features that are present in all instances
         cache.put_possible_feats(df, features)
         return features
     
@@ -207,7 +210,6 @@ def get_features(df, cache : Cache):
 
 def computeUB(node: Node, cache: Cache):
     data = node.df
-    pos_features = possible_features(data, cache)
     if cache.get_upper(data) is None:
         cart = fast_forward(data) #Compute fast forward upper bound
         ff = cart.get_n_leaves() - 1 if cart is not None else 0
