@@ -43,7 +43,9 @@ class Node:
     #Mark subproblem solved
     def mark_ready(self, cache : Cache):
 
-        self.best = self
+        if self.f is not None:
+            self.save_best(self.f)
+
         cache.put_solution(self.df, self)
         
         
