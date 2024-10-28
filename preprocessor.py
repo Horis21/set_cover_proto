@@ -33,7 +33,7 @@ def convert_to_dtcontrol_format(input_csv, output_csv, permissive=False, control
     print(f"Conversion completed. Output saved to {output_csv}")
 
 # Example usage:
-file = 'monk3_bin'
-input_csv = file + '.csv'  # Path to your original CSV file
+file = 'anneal'
+input_csv = 'data/' + file + '.csv'  # Path to your original CSV file
 output_csv = '../dtcontrol/examples/Binary/' + file +'_dtcontrol.csv'
 convert_to_dtcontrol_format(input_csv, output_csv)

@@ -355,8 +355,8 @@ def solve(df):
     root.print_solution()
 
 if __name__ == "__main__":
-    #df = pd.read_csv("anneal.csv", sep=" ", header=None)
-    df = pd.read_csv("monk3_bin.csv", sep=" ", header=None)
+    #df = pd.read_csv("data/anneal.csv", sep=" ", header=None)
+    df = pd.read_csv("data/monk3_bin.csv", sep=" ", header=None)
     #df = pd.read_csv("test.csv", sep=" ", header=None)
     #print("vertex_cover_features: ", vertex_cover_features(df))
     #print("of-by-one feature: ", one_off_features(df))
