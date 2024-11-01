@@ -100,9 +100,15 @@ def one_off_features(df, cache):
 
     ignore_feaures = set()
     features = []
+
+    if len(pos) < len(neg):
+        search = pos
+        opp = neg
+    else:
+        search = neg
+        opp = pos
     
-    for i, row in df.iterrows():
-        row = row.values
+    for row in search:
         for f in pos_features:
             if f in ignore_feaures: #If we already found a one-off based on this feature continue
                 continue
@@ -112,10 +118,7 @@ def one_off_features(df, cache):
             new_row[0] = np.logical_xor(1, new_row[0])
             new_row = tuple(new_row)
             #Check in the opposing class
-            if label == 0 and pos.__contains__(new_row):
-                features.append(f)
-                ignore_feaures.add(f)
-            elif neg.__contains__(new_row):
+            if opp.__contains__(new_row):
                 features.append(f)
                 ignore_feaures.add(f)
     #print("One-off features: ", features)
