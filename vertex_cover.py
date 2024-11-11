@@ -134,20 +134,21 @@ def check_leaf(df):
     else:
         return False
 
-def transformTree(node_id, tree, parent=None, isLeft = None):
+def transformTree(df, node_id, tree, parent=None, isLeft = None):
     if tree is None:
         return Node(None, None, parent, isLeft)
     # Create a new node object
     if tree.children_left[node_id] != tree.children_right[node_id]:  # It's a decision node
         feature = tree.feature[node_id]
-        new_node = Node(df = None, parent_feat = None, parent=parent, isLeft = isLeft)
+        new_node = Node(df = df, parent_feat = None, parent=parent, isLeft = isLeft)
         new_node.f = feature
         if parent is not None:
             new_node.parent_feat = parent.f
         
+        left_df, right_df = split(df, feature)
         # Recursively create left and right children
-        left_child = transformTree(tree.children_left[node_id],tree ,new_node, True)
-        right_child = transformTree(tree.children_right[node_id],tree, new_node, False)
+        left_child = transformTree(left_df, tree.children_left[node_id],tree ,new_node, True)
+        right_child = transformTree(right_df, tree.children_right[node_id],tree, new_node, False)
 
         left_child.parent_feat = feature
         right_child.parent_feat = feature
@@ -160,7 +161,7 @@ def transformTree(node_id, tree, parent=None, isLeft = None):
         new_node.right = right_child
 
     else:  # It's a leaf node
-        new_node = Node(df = None, parent_feat = parent.f, parent= parent, isLeft = isLeft)
+        new_node = Node(df = df, parent_feat = parent.f, parent= parent, isLeft = isLeft)
     
     return new_node
 
@@ -225,7 +226,7 @@ def computeUB(node: Node, cache: Cache):
 
 
         cache.put_upper(data, ff)
-        best = transformTree(0, cart.tree_, node.parent, node.isLeft)
+        best = transformTree(node.df, 0, cart.tree_, node.parent, node.isLeft)
         cache.put_best(data, best)
 
         if node.parent is None:
