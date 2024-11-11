@@ -315,7 +315,7 @@ def solve(df):
             continue #Skip nodes deemed unfeasible
 
         data = node.df
-        solution =cache.get_solution(data) #Check if solution already found
+        solution = cache.get_solution(data) #Check if solution already found
         if solution is not None:
             print("Solution already existing in cache: ", str(solution))
             node.lower = solution.lower
@@ -399,7 +399,7 @@ def solve(df):
             
             if node.parent is not None:
                 priority = (priority * 3 + node.parent.priority) / 4 #Also account for parent probability
-                
+
             node.priority = priority
 
             if not left_flag:
