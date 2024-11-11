@@ -175,7 +175,7 @@ def fast_forward(df):
         cart.fit(X, df[0])
         return cart
     
-def possible_features(df, cache : Cache):
+def possible_features(df, cache : Cache, parent = None):
         features = cache.get_possbile_feats(df)
         if features is not None:
             return features
@@ -195,6 +195,31 @@ def possible_features(df, cache : Cache):
         for i, f in enumerate(features_always_present):
             if f: 
                 features.remove(i) #Remove all features that are present in all instances
+
+        if parent is not None:
+            parent_pos_feats = cache.get_possbile_feats(parent.df)
+            features = set(features) & set(parent_pos_feats)
+
+        cols = set()
+        for i, col in enumerate(df.columns[1:]):
+            if i not in features:
+                continue #Don't bother with already ignored features
+
+            if col in cols:
+                features.remove(i) #Redundant feature
+            else:
+                cols.add(col)
+        
+        for i, col in enumerate(df.columns[1:]):
+            if i not in features:
+                continue #Don't bother with already ignored features
+
+            #Check if its complement feature is present
+            complement = np.logical_xor(col,col)
+            if complement in cols: #Check if the complement of this feature exists
+                features.remove(i)
+                cols.remove(col) #Remove so that we don't remove the complement as well
+
         cache.put_possible_feats(df, features)
         return features
     
@@ -312,12 +337,12 @@ def solve(df):
         
         #Get the features needed for computing priority
         one_offs, cover_features, vclb = get_features(data, cache, node.parent, node.parent_feat)
-        pos_features = possible_features(data, cache)
+        pos_features = possible_features(data, cache, node.parent)
         #Search for all features
 
         early_solution = False
 
-        need_LB = [] #Store noded for which computing the LB might be needed
+        need_LB = [] #Store nodes for which computing the LB might be needed
 
         for i in pos_features:
             #Split the data based on feature i
