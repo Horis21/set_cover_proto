@@ -94,7 +94,6 @@ def vertex_cover_features(df):
 def one_off_features(df, cache):
     #print("Computing one off features for: ", df)
     pos_features = possible_features(df, cache)
-
     pos = set(tuple(x) for x in df[df[0] == 1].values)
     neg = set(tuple(x) for x in df[df[0] == 0].values)
 
@@ -199,11 +198,17 @@ def possible_features(df, cache : Cache):
         return features
     
 #Return one_offs, cover_features and vertex cover lower bound    
-def get_features(df, cache : Cache):
+def get_features(df, cache : Cache, parent, feature):
     one_offs = cache.get_one_offs(df)
     if one_offs is None:
-        one_offs = one_off_features(df, cache)
-        cache.put_one_offs(df, one_offs)
+        if parent is None:
+            one_offs = one_off_features(df, cache)
+            cache.put_one_offs(df, one_offs)
+        else:
+            one_offs = cache.get_one_offs(parent.df)
+            if feature in one_offs:
+                one_offs = one_offs.remove(feature)
+            cache.put_one_offs(df, one_offs)
     cover_features = cache.get_vertex_cover(df)
     vclb = 0
     if cover_features is None:
@@ -242,7 +247,7 @@ def computeUB(node: Node, cache: Cache):
 def computeLB(node: Node, cache: Cache):
     data = node.df     
     if cache.get_lower(data) is None:
-        one_offs, cover_features, vclb = get_features(data, cache)
+        one_offs, cover_features, vclb = get_features(data, cache, node.parent, node.parent_feat)
         llb = max(len(one_offs), vclb)
         # print("Putting lower bound from vc or feats")
         # print("cover features: ", cover_features)
@@ -303,7 +308,7 @@ def solve(df):
         #print("Dataset lower bound: ", cache.get_lower(data))
         
         #Get the features needed for computing priority
-        one_offs, cover_features, vclb = get_features(data, cache)
+        one_offs, cover_features, vclb = get_features(data, cache, node.parent, node.parent_feat)
         pos_features = possible_features(data, cache)
         #Search for all features
         for i in pos_features:
