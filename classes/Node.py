@@ -50,10 +50,14 @@ class Node:
         cache.put_solution(self.df, self)
         
         
-    def save_best(self, f):
+    def save_best(self, f, from_sol = None):
         self.best.f = f
-        self.best.left = self.lefts[f].best
-        self.best.right = self.rights[f].best
+        if from_sol is None:
+            self.best.left = self.lefts[f].best
+            self.best.right = self.rights[f].best
+        else:
+            self.best.left = from_sol.left
+            self.best.right = from_sol.right
         self.best.lower = self.lower
         self.best.upper = self.upper
 
@@ -149,7 +153,7 @@ class Node:
         size = 0
         depth = 0
         q = queue.Queue()
-        q.put((self, 1))
+        q.put((self, 0))
         while not q.empty():
             pair = q.get()
             node = pair[0]

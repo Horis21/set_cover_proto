@@ -296,6 +296,8 @@ def solve(df):
             node.lower = solution.lower
             node.upper = solution.upper
             node.improving = solution.improving
+            node.f = solution.f
+            node.save_best(solution.f, solution)
             node.link_and_prune(solution, cache)
             continue
        
@@ -312,6 +314,11 @@ def solve(df):
         one_offs, cover_features, vclb = get_features(data, cache, node.parent, node.parent_feat)
         pos_features = possible_features(data, cache)
         #Search for all features
+
+        early_solution = False
+
+        need_LB = [] #Store noded for which computing the LB might be needed
+
         for i in pos_features:
             #Split the data based on feature i
             left_df, right_df = split(data, i)
@@ -325,16 +332,25 @@ def solve(df):
             if left_flag:
                 mark_leaf(left, cache)
             else:
+                need_LB.append(left)
                 computeUB(left, cache)
-                computeLB(left, cache)
             if right_flag:
                 mark_leaf(right, cache)
             else: 
+                need_LB.append(right)
                 computeUB(right, cache)
-                computeLB(right, cache)
 
             node.lefts[i] = left
             node.rights[i] = right
+
+            if left.upper + right.upper + 1 == node.lower: #Solution found
+                node.upper = node.lower
+                node.save_best(i)
+                node.f = i
+                node.link_and_prune(node.best, cache)
+                node.mark_ready(cache)
+                early_solution = True
+                break #solution found here no need to search further
 
             if left.lower + right.lower + 1 > node.upper:
                 left.feasible = False
@@ -355,7 +371,12 @@ def solve(df):
                 pq.put((priority, left))
             if not right_flag:
                 pq.put((priority, right))
-        node.backpropagate(cache)
+
+        if not early_solution:
+            for child in need_LB:
+                computeLB(child, cache)
+
+            node.backpropagate(cache)
 
     print("done")
     print("Only explored:", explored)
