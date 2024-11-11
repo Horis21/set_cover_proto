@@ -147,21 +147,24 @@ class Node:
 
     def print_solution(self):
         size = 0
+        depth = 0
         q = queue.Queue()
-        q.put(self)
+        q.put((self, 1))
         while not q.empty():
-            node = q.get()
+            pair = q.get()
+            node = pair[0]
+            depth = max(depth,pair[1])
             print(node)
             if node.f is None:
-                print("ok check this leaf: ")
-                print(node.df)
+                print("above is leaf")
             else:
                 size += 1
             if node.left is not None:
-                q.put(node.left)
+                q.put((node.left, pair[1] + 1))
             if node.right is not None:
-                q.put(node.right)
+                q.put((node.right, pair[1] + 1))
         print("size of the tree: ", size)
+        print("depth of the tree: ", depth)
 
     def put_node_upper(self, bound):
         previous_upper = self.upper
