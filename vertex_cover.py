@@ -344,6 +344,9 @@ def solve(df):
 
         need_LB = [] #Store nodes for which computing the LB might be needed
 
+        if node.parent is not None:
+            parent_cover = cache.get_vertex_cover(node.parent.df)
+
         for i in pos_features:
             #Split the data based on feature i
             left_df, right_df = split(data, i)
@@ -386,11 +389,18 @@ def solve(df):
                 continue
 
             #Compute priority of the child nodes
-            priority = 4
+            priority = 11
             if i in one_offs:
-                priority -= 2  # One_off features is 100% sure to be in the optimal tree
+                priority -= 6  # One_off features is 100% sure to be in the optimal tree
             if i in cover_features:
-                priority -= 1  # Vertex cover feature is only highly likely to be present
+                priority -= 3  # Vertex cover feature is only highly likely to be present
+            if node.parent is not None and i in parent_cover:
+                priority -= 1 #Node not in any list, but in parent cover than it is only so slighltly more probable to be in the solution
+            
+            if node.parent is not None:
+                priority = (priority * 3 + node.parent.priority) / 4 #Also account for parent probability
+                
+            node.priority = priority
 
             if not left_flag:
                 pq.put((priority, left))

@@ -14,6 +14,7 @@ class Node:
         self.feasible = True
         self.lefts = {}
         self.best_f = None
+        self.priority = None
         self.rights = {}
         self.best = None
         self.left = None
