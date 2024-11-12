@@ -8,6 +8,9 @@ from sklearn.tree import export_text
 from classes.Node import Node
 from classes.Cache import Cache
 from classes.Cache import HashableDataFrame
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.metrics import pairwise_distances
+from sklearn.metrics import pairwise_distances_argmin_min
 import sys
 
 def get_difference_table(df):
@@ -55,8 +58,39 @@ def find_vertex_cover(diff_df, verbose=True):
         print("No solution found")
         sys.exit(1)
 
-def vertex_cover_features(df):
-    if df.shape[0] <= 200:
+def get_sample(df, sample_size):
+    # Initialize an empty list to hold the representative samples
+    representative_samples = []
+
+
+    # Apply Agglomerative Clustering with Hamming distance
+    clustering = AgglomerativeClustering(n_clusters=sample_size, metric='precomputed', linkage = 'average')
+    
+    # Compute the pairwise Hamming distance matrix
+    hamming_distances = pairwise_distances(df, metric='hamming')
+    
+    data = df.copy()
+
+    # Fit the clustering model
+    cluster_labels = clustering.fit_predict(hamming_distances)
+    data['cluster'] = cluster_labels
+
+    for cluster_id in range(sample_size):
+        # Get all points in the current cluster
+        cluster_points = data[data['cluster'] == cluster_id].drop(columns=['cluster'])
+
+        # Calculate the mean point for the cluster (binary mean vector)
+        binary_mean = (cluster_points.mean(axis=0) >= 0.5).astype(int).values.reshape(1, -1)
+
+        # Find the point closest to the binary mean using Hamming distance
+        closest_idx, _ = pairwise_distances_argmin_min(binary_mean, cluster_points, metric='hamming')
+        representative_samples.append(df.iloc[cluster_points.index[closest_idx[0]]])
+
+    representative_samples = pd.DataFrame(representative_samples)
+    return representative_samples
+
+def vertex_cover_features(df, sample_size, gap):
+    if df.shape[0] <= sample_size:
         diff_table = get_difference_table(df)
         features = find_vertex_cover(diff_table, verbose=False)
         #print("Require features: ", features)
@@ -67,7 +101,7 @@ def vertex_cover_features(df):
         # repeat multiple times
         for i in range(10):
             # Get a random sample from the rows (This could be improved by using clustering)
-            sample = df.sample(100)
+            sample = get_sample(df, sample_size)
             diff_table = get_difference_table(sample)
             features = find_vertex_cover(diff_table, verbose=False)
             # the lower bound is the maximum of all the lower bounds we have obtained
@@ -224,7 +258,7 @@ def possible_features(df, cache : Cache, parent = None):
         return features
     
 #Return one_offs, cover_features and vertex cover lower bound    
-def get_features(df, cache : Cache, parent, feature):
+def get_features(df, cache : Cache, parent, feature, sample_size = None, gap = None):
     one_offs = cache.get_one_offs(df)
     if one_offs is None:
         if parent is None:
@@ -238,7 +272,7 @@ def get_features(df, cache : Cache, parent, feature):
     cover_features = cache.get_vertex_cover(df)
     vclb = 0
     if cover_features is None:
-        cover_features, vclb = vertex_cover_features(df)
+        cover_features, vclb = vertex_cover_features(df, sample_size, gap)
         cache.put_vertex_cover(df, cover_features)
     return one_offs, cover_features, vclb
     
@@ -270,10 +304,10 @@ def computeUB(node: Node, cache: Cache):
     node.best = cache.get_best(data)
     node.best.parent_feat = node.parent_feat
 
-def computeLB(node: Node, cache: Cache):
+def computeLB(node: Node, cache: Cache, sample_size, gap):
     data = node.df     
     if cache.get_lower(data) is None:
-        one_offs, cover_features, vclb = get_features(data, cache, node.parent, node.parent_feat)
+        one_offs, cover_features, vclb = get_features(data, cache, node.parent, node.parent_feat, sample_size, gap)
         llb = max(len(one_offs), vclb)
         # print("Putting lower bound from vc or feats")
         # print("cover features: ", cover_features)
@@ -291,7 +325,7 @@ def mark_leaf(node : Node, cache : Cache):
     cache.put_upper(node.df, 0)
     node.mark_ready(cache)
 
-def solve(df):
+def solve(df, sample_size = 200, gap = None, parent_priority_infuence = None, set_cover_influence = None, parent_cover_influence = None):
     df = HashableDataFrame(df)
     cache = Cache()
     pq = queue.PriorityQueue()
@@ -303,7 +337,7 @@ def solve(df):
     root = Node(df, None, None, None)
     #Add the root
     pq.put((1, root))
-    computeLB(root,cache)
+    computeLB(root,cache, sample_size, gap)
     computeUB(root,cache)
     list = []
     while not pq.empty():
@@ -409,7 +443,7 @@ def solve(df):
 
         if not early_solution:
             for child in need_LB:
-                computeLB(child, cache)
+                computeLB(child, cache, sample_size, gap)
 
             node.backpropagate(cache)
 
