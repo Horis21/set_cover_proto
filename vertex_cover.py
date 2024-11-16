@@ -414,11 +414,6 @@ def solve(df, sample_size = 200, gap = None, parent_priority_infuence = None, se
                 early_solution = True
                 break #solution found here no need to search further
 
-            if left.lower + right.lower + 1 > node.upper:
-                left.feasible = False
-                right.feasible = False
-                continue
-
             if right_flag and left_flag:
                 continue
 
