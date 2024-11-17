@@ -325,6 +325,28 @@ def mark_leaf(node : Node, cache : Cache):
     cache.put_upper(node.df, 0)
     node.mark_ready(cache)
 
+def compute_priority(node : Node, cache):
+    #Get the features needed for computing priority
+    one_offs, cover_features, vclb = get_features(node.df, cache, node.parent, node.parent_feat)
+    if node.parent is not None:
+        parent_cover = cache.get_vertex_cover(node.parent.df)
+
+    i = node.parent_feat
+    #Compute priority of the child nodes
+    priority = 11
+    if i in one_offs:
+        priority -= 6  # One_off features is 100% sure to be in the optimal tree
+    if i in cover_features:
+        priority -= 3  # Vertex cover feature is only highly likely to be present
+    if node.parent is not None and i in parent_cover:
+        priority -= 1 #Node not in any list, but in parent cover than it is only so slighltly more probable to be in the solution
+    
+    if node.parent is not None:
+        priority = (priority * 3 + node.parent.priority) / 4 #Also account for parent probability
+
+    return priority
+    
+
 def solve(df, sample_size = 200, gap = None, parent_priority_infuence = None, set_cover_influence = None, parent_cover_influence = None):
     df = HashableDataFrame(df)
     cache = Cache()
@@ -339,10 +361,8 @@ def solve(df, sample_size = 200, gap = None, parent_priority_infuence = None, se
     pq.put((1, root))
     computeLB(root,cache, sample_size, gap)
     computeUB(root,cache)
-    list = []
     while not pq.empty():
         node = pq.get()[1]
-        list.append(node)
         print("Looking at node: ", node)
         if not node.feasible: 
             print("Node is not feasible, skipping.")
@@ -360,26 +380,13 @@ def solve(df, sample_size = 200, gap = None, parent_priority_infuence = None, se
             node.link_and_prune(solution, cache)
             continue
        
-
         explored += 1 #Only updated explored nodes if not a leaf and not in cache
 
-        
-        #print("Dataset upper bound: ", cache.get_upper(data))
-
-        
-        #print("Dataset lower bound: ", cache.get_lower(data))
-        
-        #Get the features needed for computing priority
-        one_offs, cover_features, vclb = get_features(data, cache, node.parent, node.parent_feat)
-        pos_features = possible_features(data, cache, node.parent)
-        #Search for all features
-
+        need_LB = [] #Store nodes for which computing the LB might be needed
         early_solution = False
 
-        need_LB = [] #Store nodes for which computing the LB might be needed
-
-        if node.parent is not None:
-            parent_cover = cache.get_vertex_cover(node.parent.df)
+        #Search for all features
+        pos_features = possible_features(data, cache, node.parent)
 
         for i in pos_features:
             #Split the data based on feature i
@@ -388,19 +395,16 @@ def solve(df, sample_size = 200, gap = None, parent_priority_infuence = None, se
             left = Node(left_df, i, node, True)
             right = Node(right_df, i, node, False)
 
-            left_flag = check_leaf(left_df)
-            right_flag = check_leaf(right_df)
-
-            if left_flag:
+            if check_leaf(left_df):
                 mark_leaf(left, cache)
             else:
                 need_LB.append(left)
                 computeUB(left, cache)
-            if right_flag:
+            if check_leaf(right_df):
                 mark_leaf(right, cache)
-            else: 
+            else:
                 need_LB.append(right)
-                computeUB(right, cache)
+                computeUB(right, cache)               
 
             node.lefts[i] = left
             node.rights[i] = right
@@ -414,31 +418,13 @@ def solve(df, sample_size = 200, gap = None, parent_priority_infuence = None, se
                 early_solution = True
                 break #solution found here no need to search further
 
-            if right_flag and left_flag:
-                continue
-
-            #Compute priority of the child nodes
-            priority = 11
-            if i in one_offs:
-                priority -= 6  # One_off features is 100% sure to be in the optimal tree
-            if i in cover_features:
-                priority -= 3  # Vertex cover feature is only highly likely to be present
-            if node.parent is not None and i in parent_cover:
-                priority -= 1 #Node not in any list, but in parent cover than it is only so slighltly more probable to be in the solution
-            
-            if node.parent is not None:
-                priority = (priority * 3 + node.parent.priority) / 4 #Also account for parent probability
-
-            node.priority = priority
-
-            if not left_flag:
-                pq.put((priority, left))
-            if not right_flag:
-                pq.put((priority, right))
-
         if not early_solution:
             for child in need_LB:
                 computeLB(child, cache, sample_size, gap)
+                
+                priority = compute_priority(child, cache)
+                node.priority = priority
+                pq.put((priority, child))
 
             node.backpropagate(cache)
 
