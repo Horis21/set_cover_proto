@@ -80,6 +80,16 @@ class Node:
         childrenLower = 20000000
 
         self.update_improving()
+        updated = False
+
+        cachedUB = cache.get_upper(self.df)
+        if cachedUB < self.upper:
+            self.upper = cachedUB
+            self.best = cache.get_best(self.df)
+            self.best_f = self.best.f
+
+            updated = True
+
 
         pos_features = cache.get_possbile_feats(self.df)
         #This could be optimized in a future versions by checking if bounds for all childs have been added and only checking 
@@ -107,7 +117,6 @@ class Node:
         if childrenLower == 20000000:
             childrenLower = 0 #Lower bound is 0 if no feasible childrent have been yet created
 
-        updated = False
         if childrenUpper < self.upper:
             if self.parent is None:
                 print("updated the best for root at some point")
