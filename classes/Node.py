@@ -1,6 +1,5 @@
 import queue
 from classes.Cache import Cache
-import copy
 
 class Node:
     def __init__(self, df, parent_feat, parent ,isLeft):

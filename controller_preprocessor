@@ -1,0 +1,30 @@
+import pandas as pd
+from dtcontrol.benchmark_suite import BenchmarkSuite
+from dtcontrol.pre_processing.label_pre_processor import LabelPreProcessor
+from dtcontrol.pre_processing.maxfreq_pre_processor import MaxFreqPreProcessor
+from dtcontrol.pre_processing.norm_pre_processor import NormPreProcessor
+from genericpath import *
+import numpy as np
+
+if __name__ == "__main__":
+    loader = BenchmarkSuite()
+    preprocessor = MaxFreqPreProcessor()
+    file = 'cartpole'
+    filename = 'controller_examples/' + file + '.scs'
+    output_csv = 'experiment_datasets/' + file +'_bobotree.csv' 
+    loader.add_datasets('controller_examples', include=['cartpole','aircraft','helicopter','10rooms','vehicle'])
+
+    for ds in loader.datasets:
+        print("datsaet called: ", ds.filename)
+        ds.load_if_necessary()
+       
+        preprocssed_dataset = preprocessor.preprocess(ds)
+        x = preprocssed_dataset.get_numeric_x()
+        y = preprocssed_dataset.get_single_labels()
+
+        x_df = pd.DataFrame(x)
+        y = y.flatten()
+        # Add labels (y) as the first column
+        df = pd.concat([pd.Series(y, name=0), x_df], axis=1)
+        
+        print(df)
