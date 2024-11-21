@@ -3,15 +3,71 @@ from dtcontrol.benchmark_suite import BenchmarkSuite
 from dtcontrol.pre_processing.label_pre_processor import LabelPreProcessor
 from dtcontrol.pre_processing.maxfreq_pre_processor import MaxFreqPreProcessor
 from dtcontrol.pre_processing.norm_pre_processor import NormPreProcessor
+from pystreed.binarizer import Binarizer
 from genericpath import *
 import numpy as np
+
+def one_vs_all(df : pd.DataFrame, y):
+   datasets = []
+   copy = df.copy()
+   for label in np.unique(y)[:-1]:
+        one_vs_df = copy.copy()
+        one_vs_df[0] = (one_vs_df[0] == label).astype(int)
+
+        copy = copy[copy[0] != label]
+
+        datasets.append(one_vs_df)
+
+   return datasets
+
+def check_impossible_split(df : pd.DataFrame):
+    pos = set(tuple(x[1:]) for x in df[df[0] == 1].values)
+    neg = set(tuple(x[1:]) for x in df[df[0] == 0].values)
+    for i, row in df.iterrows():
+        row = tuple(row[1:])
+
+    if len(pos) < len(neg):
+        search = pos
+        opp = neg
+    else:
+        search = neg
+        opp = pos
+
+    for row in search:
+        if row in opp:
+            return True
+    
+    return False
+        
+
+def binarize_dfs(dfs):
+    binarized_dfs = []
+    for df in dfs:
+        n_thresholds = np.full(df.shape[1] - 1, 2)
+        
+        x = df.iloc[:, 1:]
+        y = df[0]
+
+        while True:
+            binarizer = Binarizer("quantile",n_thresholds, None,None)
+            binarizer.fit(x,y)
+        
+            df = pd.concat([y, pd.DataFrame(binarizer.transform(x))], axis=1)
+            df.columns = [0] + list(range(1, df.shape[1]))
+            df.reset_index(drop=True, inplace=True)
+
+            if check_impossible_split(df):
+                n_thresholds += 1
+            else:
+                break
+
+        binarized_dfs.append(df)
+    return binarized_dfs
+
 
 if __name__ == "__main__":
     loader = BenchmarkSuite()
     preprocessor = MaxFreqPreProcessor()
-    file = 'cartpole'
-    filename = 'controller_examples/' + file + '.scs'
-    output_csv = 'experiment_datasets/' + file +'_bobotree.csv' 
     loader.add_datasets('controller_examples', include=['cartpole','aircraft','helicopter','10rooms','vehicle'])
 
     for ds in loader.datasets:
@@ -23,8 +79,25 @@ if __name__ == "__main__":
         y = preprocssed_dataset.get_single_labels()
 
         x_df = pd.DataFrame(x)
+
+        # Flatten y to ensure it's a 1D array
         y = y.flatten()
+        
         # Add labels (y) as the first column
         df = pd.concat([pd.Series(y, name=0), x_df], axis=1)
         
-        print(df)
+        # Rename feature columns to start from 1
+        df.columns = [0] + list(range(1, x_df.shape[1] + 1))
+        
+        # Reset the index to ensure a sequential index starting from 0
+        df.reset_index(drop=True, inplace=True)
+
+        one_vs_all_dfs = one_vs_all(df, y)
+        binarized_dfs = binarize_dfs(one_vs_all_dfs)
+
+        labels = np.unique(y)[:-1]
+        #Save datasets
+        for i, dataset in enumerate(binarized_dfs):
+            output_csv = 'experiment_datasets/' + ds.filename.split("\\")[1].split(".")[0] + '/' + ds.filename.split("\\")[1].split(".")[0]  + '_' + str(labels[i]) + '_versus_all.csv'
+            with open(output_csv, 'w', newline='') as file:
+                dataset.to_csv(file, index=False, header=False)
