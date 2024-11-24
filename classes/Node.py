@@ -21,7 +21,6 @@ class Node:
         self.parent = parent
 
     def backpropagate(self, cache : Cache):
-        print("Backpropagating")
         if not self.feasible:
             return
         
@@ -137,7 +136,6 @@ class Node:
 
         if self.parent is None:
             print(f"Updated local bounds for root lower = {self.lower}, upper = {self.upper}")
-        #print("Lefts and rights: ")
 
         if self.lower == self.upper:
             if self.parent is None:
@@ -149,7 +147,6 @@ class Node:
 
         
     def cut_branches(self):
-        #print(f"Cutting: node = {str(self)}")
         self.feasible = False
         for left in self.lefts.values():
             left.cut_branches()
@@ -176,8 +173,7 @@ class Node:
                 q.put((node.left, pair[1] + 1))
             if node.right is not None:
                 q.put((node.right, pair[1] + 1))
-        print("size of the tree: ", size)
-        print("depth of the tree: ", depth)
+        return size, depth
 
     def put_node_upper(self, bound):
         previous_upper = self.upper
