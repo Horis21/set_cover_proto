@@ -2,7 +2,7 @@ import queue
 from classes.Cache import Cache
 
 class Node:
-    def __init__(self, df, parent_feat, parent ,isLeft):
+    def __init__(self, df, parent_feat = None, parent = None ,isLeft = None, is_one_off_child = None, set_cover_counts = None):
         self.df = df
         self.parent_feat = parent_feat
         self.isLeft = isLeft
@@ -11,9 +11,9 @@ class Node:
         self.improving = 20000000
         self.lower = 0
         self.feasible = True
+        self.is_one_off_child = is_one_off_child
+        self.set_cover_counts = set_cover_counts
         self.lefts = {}
-        self.best_f = None
-        self.priority = None
         self.rights = {}
         self.best = None
         self.left = None
@@ -103,12 +103,8 @@ class Node:
 
             childrenLower = min(childrenLower,  left.lower + right.upper + 1)
 
-
-        if childrenUpper < self.upper:
-            if self.parent is None:
-                print("updated the best for root at some point")
-            
-            #New best solution found
+        #New best solution found
+        if childrenUpper < self.upper:  
             self.save_best(best_feat)
             self.put_node_upper(childrenUpper)
             if cache.put_upper(self.df, childrenUpper):
@@ -129,7 +125,7 @@ class Node:
             print(f"Updated local bounds for root lower = {self.lower}, upper = {self.upper}")
 
         
-        if self.lower == self.upper:
+        if self.lower == self.upper or self.lower > self.improving:
             if self.parent is None:
                 print("found root solution")
             self.link_and_prune(self.best, cache)
@@ -200,24 +196,38 @@ class Node:
         direction = "left" if self.isLeft else "right"
         return str(self.parent) + " " + direction + " " + str(self.parent_feat)
 
-    #Comparison methods otherwise priority queue bricks
+    #Comparison methods for Node class
     def __eq__(self, other):
-        return True
+        if not isinstance(other, Node):
+            raise TypeError('Can only compare two Nodes')
+        if self.parent == other.parent and self.parent_feat == other.parent_feat:
+            return True
+        else:
+            return False   
 
-    def __ne__(self, other):
-        return True
+        
 
     def __lt__(self, other):
-        return True
-
-    def __gt__(self, other):
-        return True
+        if not isinstance(other, Node):
+            raise TypeError('Can only compare two Nodes')
+        if self.lower < other.lower:
+            return True
+        elif self.lower == other.lower and self.is_one_off_child and not other.is_one_off_child:
+            return True
+        elif self.lower == other.lower and self.set_cover_counts > other.set_cover_counts:
+            return True
+        return False
 
     def __le__(self, other):
-        return True
+        if not isinstance(other, Node):
+            raise TypeError('Can only compare two Nodes')
+        if self.lower < other.lower:
+            return True
+        elif self.lower == other.lower and self.is_one_off_child and not other.is_one_off_child:
+            return True
+        elif self.lower == other.lower and self.set_cover_counts >= other.set_cover_counts:
+            return True
+        return False
 
-    def __ge__(self, other):
-        return True
-    
    
 

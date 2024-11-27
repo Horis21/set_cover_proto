@@ -159,7 +159,6 @@ class Solver:
 
         
     def one_off_features(self, df):
-        print(df)
         pos_features = self.possible_features(df)
         pos = set(tuple(x) for x in df[df[0] == 1].values)
         neg = set(tuple(x) for x in df[df[0] == 0].values)
@@ -202,7 +201,7 @@ class Solver:
 
     def transformTree(self, df, node_id, tree, parent=None, isLeft = None):
         if tree is None:
-            return Node(None, None, parent, isLeft)
+            return Node(df, None, parent, isLeft)
         # Create a new node object
         if tree.children_left[node_id] != tree.children_right[node_id]:  # It's a decision node
             feature = tree.feature[node_id]
@@ -290,7 +289,7 @@ class Solver:
             return features
         
     #Return one_offs, cover_features and vertex cover lower bound    
-    def get_features(self, df, parent, feature):
+    def get_features(self, df, parent = None, feature = None):
         one_offs = self.cache.get_one_offs(df)
         if one_offs is None and (self.lower_bound_strategy == 'one-off' or self.lower_bound_strategy == 'both'):
             if parent is None:
@@ -350,7 +349,7 @@ class Solver:
         pq = queue.PriorityQueue()
         explored = 0
         
-        root = Node(df, None, None, None)
+        root = Node(df)
         #Add the root
         pq.put(root)
         self.computeLB(root)
@@ -379,12 +378,14 @@ class Solver:
             #Search for all features
             pos_features = self.possible_features(data, node.parent)
 
+            one_offs, cover_features, vclb = self.get_features(data)
             for i in pos_features:
                 #Split the data based on feature i
                 left_df, right_df = self.split(data, i)
-            
-                left = Node(left_df, i, node, True)
-                right = Node(right_df, i, node, False)
+                is_one_off_child = True if i in one_offs else False
+                set_cover_counts = cover_features[i]
+                left = Node(left_df, i, node, True, is_one_off_child,set_cover_counts)
+                right = Node(right_df, i, node, False, is_one_off_child, set_cover_counts)
 
                 if self.check_leaf(left_df):
                     self.mark_leaf(left)
