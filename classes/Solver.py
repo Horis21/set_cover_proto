@@ -14,11 +14,9 @@ from sklearn.metrics import pairwise_distances_argmin_min
 import sys
 
 class Solver:
-    def __init__(self, sample_size, MIP_gap, parent_priority_influence, set_cover_influence, cover_runs, lower_bound_strategy = 'both'):
+    def __init__(self, sample_size = 200, MIP_gap = 0.05, cover_runs = 1, lower_bound_strategy = 'both'):
         self.sample_size = sample_size
         self.MIP_gap = MIP_gap
-        self.parent_priority_influence = parent_priority_influence
-        self.set_cover_influence = set_cover_influence
         self.cover_runs = cover_runs
         self.lower_bound_strategy = lower_bound_strategy
         self.cache = Cache()
@@ -38,7 +36,7 @@ class Solver:
         
         if len(diffs) == 0:
             print("coaie")
-            print("df")
+            print(df)
         diff_df = pd.concat(diffs, axis=1).T
         return diff_df
 
@@ -73,7 +71,8 @@ class Solver:
             sys.exit(1)
 
     def get_sample(self, df):
-        
+        if df.size == 0:
+            print("get sample df  is empty")
         labels = np.unique(df[0].values)
         cluster_size = int(np.floor(self.sample_size / len(labels)))
 
@@ -83,9 +82,14 @@ class Solver:
             clustered_points = self.apply_clustering(class_points, cluster_size)
             sample = pd.concat([sample, clustered_points])
 
+        if sample.size == 0:
+            print("final sample is empty")
+            print(df)
         return sample
 
     def apply_clustering(self, df, cluster_size):
+        if df.size == 0:
+            print("applying clustering on empty sample")
         if df.shape[0] <= cluster_size:
             return df
         
@@ -119,6 +123,9 @@ class Solver:
             representative_samples.append(df.loc[cluster_points.index[closest_idx[0]]])
 
         representative_samples = pd.DataFrame(representative_samples)
+        if representative_samples.size == 0:
+            print("representative samples is empty")
+            print(df)
         return representative_samples
 
     def vertex_cover_features(self, df):
@@ -152,6 +159,7 @@ class Solver:
 
         
     def one_off_features(self, df):
+        print(df)
         pos_features = self.possible_features(df)
         pos = set(tuple(x) for x in df[df[0] == 1].values)
         neg = set(tuple(x) for x in df[df[0] == 0].values)
@@ -291,7 +299,7 @@ class Solver:
             else:
                 one_offs = self.cache.get_one_offs(parent.df)
                 if feature in one_offs:
-                    one_offs = one_offs.remove(feature)
+                    one_offs.remove(feature)
                 self.cache.put_one_offs(df, one_offs)
         cover_features = self.cache.get_vertex_cover(df)
         vclb = 0
@@ -337,38 +345,18 @@ class Solver:
         self.cache.put_upper(node.df, 0)
         node.mark_ready(self.cache)
 
-    def compute_priority(self, node : Node):
-        #Get the features needed for computing priority
-        one_offs, cover_features, vclb = self.get_features(node.df, node.parent, node.parent_feat)
-        i = node.parent_feat
-        #Compute priority of the child nodes
-        priority = 101
-        if i in one_offs:
-            priority -= 100 * (1-self.set_cover_influence) # One_off features is 100% sure to be in the optimal tree
-       
-        importance_in_cover = cover_features[i] / sum(cover_features)
-        priority -= 100 *self.set_cover_influence * importance_in_cover  # Vertex cover feature is only highly likely to be present
-        
-        if node.parent is not None:
-            priority = priority * (1-self.parent_priority_influence) + node.parent.priority * self.parent_priority_influence #Also account for parent priority
-
-        node.priority = priority
-        return priority
-        
-
     def solve(self, orig_df):
         df = HashableDataFrame(orig_df.copy())
         pq = queue.PriorityQueue()
         explored = 0
         
         root = Node(df, None, None, None)
-        root.priority = 1
         #Add the root
-        pq.put((1, root))
+        pq.put(root)
         self.computeLB(root)
         self.computeUB(root)
         while not pq.empty():
-            node = pq.get()[1]
+            node = pq.get()
             if not node.feasible: 
                 continue #Skip nodes deemed unfeasible
 
@@ -415,7 +403,6 @@ class Solver:
                 if left.upper + right.upper + 1 == node.lower: #Solution found
                     node.upper = node.lower
                     node.save_best(i)
-                    node.f = i
                     node.link_and_prune(node.best, self.cache)
                     node.mark_ready(self.cache)
                     early_solution = True
@@ -425,8 +412,7 @@ class Solver:
                 for child in need_LB:
                     self.computeLB(child)
                     
-                    priority = self.compute_priority(child)
-                    pq.put((priority, child))
+                    pq.put(child)
 
                 node.backpropagate(self.cache)
         size, depth = root.print_solution()

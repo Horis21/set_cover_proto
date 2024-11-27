@@ -71,21 +71,20 @@ class Node:
         else:
             sibling = parent.lefts[f]
 
-        self.improving = min(self.improving, parent.improving - sibling.lower)
+        self.improving = min(self.improving, parent.improving - sibling.lower, self.upper-1)
 
     def update_local_bounds(self, cache : Cache):
         childrenUpper = 20000000
         childrenLower = 20000000
 
-        self.update_improving()
+        
         updated = False
 
         cachedUB = cache.get_upper(self.df)
         if cachedUB < self.upper:
             self.upper = cachedUB
             self.best = cache.get_best(self.df)
-            self.best_f = self.best.f
-
+        
             updated = True
 
 
@@ -97,33 +96,23 @@ class Node:
             right =  self.rights[feature]
 
             upperBound = left.upper + right.upper + 1
+
             if upperBound < childrenUpper:
                 childrenUpper = upperBound
-                if upperBound < self.upper:
-                    self.best_f = feature
-            self.improving = min(self.improving, upperBound-1)
+                best_feat = feature
 
-            lowerBound = left.lower + right.upper + 1
+            childrenLower = min(childrenLower,  left.lower + right.upper + 1)
 
-            #Prune infeasible children pair
-            if lowerBound > self.improving:
-                left.cut_branches()
-                right.cut_branches()
-
-            childrenLower = min(childrenLower, lowerBound)
-
-        if childrenLower == 20000000:
-            childrenLower = 0 #Lower bound is 0 if no feasible childrent have been yet created
 
         if childrenUpper < self.upper:
             if self.parent is None:
                 print("updated the best for root at some point")
-            cache.put_upper(self.df, childrenUpper)
+            
             #New best solution found
-            self.save_best(self.best_f)
+            self.save_best(best_feat)
             self.put_node_upper(childrenUpper)
             if cache.put_upper(self.df, childrenUpper):
-                cache.put_best(self.df, self.best) # Only if it's better than that we have in the cache
+                cache.put_best(self.df, self.best) # Only if it's better than that we have in the cache (everytime anyway I think)
             updated = True
 
         if childrenLower > self.lower:
@@ -131,18 +120,31 @@ class Node:
             self.put_node_lower(childrenLower)
             updated = True
 
+        self.update_improving()
+
         if not updated:
             return False
 
         if self.parent is None:
             print(f"Updated local bounds for root lower = {self.lower}, upper = {self.upper}")
 
+        
         if self.lower == self.upper:
             if self.parent is None:
                 print("found root solution")
             self.link_and_prune(self.best, cache)
             self.mark_ready(cache)
-        
+
+        else:
+            for feature in pos_features:
+                left = self.lefts[feature]
+                right =  self.rights[feature]
+
+                if left.lower + right.lower + 1 > self.improving:
+                    left.cut_branches()
+                    right.cut_branches()
+
+
         return True
 
         
