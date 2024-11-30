@@ -124,12 +124,13 @@ class Node:
         if self.parent is None:
             print(f"Updated local bounds for root lower = {self.lower}, upper = {self.upper}")
 
-        
+        #Cannot improve anymore
         if self.lower == self.upper or self.lower > self.improving:
             if self.parent is None:
                 print("found root solution")
             self.link_and_prune(self.best, cache)
-            self.mark_ready(cache)
+            if self.lower == self.upper:
+                self.mark_ready(cache) #Only if optimal solution is verified
 
         else:
             for feature in pos_features:
