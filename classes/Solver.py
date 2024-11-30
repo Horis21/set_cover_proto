@@ -177,7 +177,6 @@ class Solver:
             for f in pos_features:
                 if f in ignore_feaures: #If we already found a one-off based on this feature continue
                     continue
-                label = row[0]
                 new_row = np.copy(row)
                 new_row[f+1] = np.logical_xor(1, new_row[f+1]) #Compute the off-by-one feature vector
                 new_row[0] = np.logical_xor(1, new_row[0])
@@ -382,8 +381,8 @@ class Solver:
             for i in pos_features:
                 #Split the data based on feature i
                 left_df, right_df = self.split(data, i)
-                is_one_off_child = True if i in one_offs else False
-                set_cover_counts = cover_features[i]
+                is_one_off_child = True if one_offs is not None and i in one_offs else False
+                set_cover_counts = cover_features[i] if cover_features is not None else 0
                 left = Node(left_df, i, node, True, is_one_off_child,set_cover_counts)
                 right = Node(right_df, i, node, False, is_one_off_child, set_cover_counts)
 
