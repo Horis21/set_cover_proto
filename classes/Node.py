@@ -41,10 +41,7 @@ class Node:
         
     #Mark subproblem solved
     def mark_ready(self, cache : Cache):
-
-        if self.f is not None:
-            self.save_best(self.f)
-        else:
+        if self.f is  None:
             self.best = self
         cache.put_solution(self.df, self)
         
@@ -149,10 +146,12 @@ class Node:
         self.feasible = False
         for left in self.lefts.values():
             left.cut_branches()
-        for rigth in self.rights.values():
-            rigth.cut_branches()
-
-
+            left.parent = None
+        for right in self.rights.values():
+            right.cut_branches()
+            right.parent = None
+        self.lefts = {}
+        self.rights = {}
 
     def print_solution(self):
         size = 0
