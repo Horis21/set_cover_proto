@@ -1,4 +1,3 @@
-import copy
 import queue
 from classes.Cache import Cache
 
@@ -41,8 +40,9 @@ class Node:
         self.cut_branches() # Found solution no need to search anymore            
         
     #Mark subproblem solved
-    def mark_ready(self, cache : Cache):        
-        self.best = self
+    def mark_ready(self, cache : Cache): 
+        self.parent = None       
+        self.best = self #Sanity check
         
         cache.put_solution(self.df, self)
         
@@ -72,18 +72,9 @@ class Node:
         self.improving = min(self.improving, parent.improving - sibling.lower, self.upper-1)
 
     def update_local_bounds(self, cache : Cache):
-        if self.df is None:
-            print(self.parent)
-            print(self.best)
-            print(self.left)
-            print(self.right)
-            print(self.lower)
-            print(self.upper)
-
         childrenUpper = 20000000
         childrenLower = 20000000
 
-        
         updated = False
 
         cachedUB = cache.get_upper(self.df)
@@ -154,7 +145,7 @@ class Node:
     def cut_branches(self):
         self.feasible = False
         self.df = None
-        self.best = None
+        self.best = self
         self.parent = None
         for left in self.lefts.values():
             left.cut_branches()
@@ -220,6 +211,8 @@ class Node:
     def __lt__(self, other):
         if not isinstance(other, Node):
             raise TypeError('Can only compare two Nodes')
+        if not self.feasible:
+            return True
         if self.lower < other.lower:
             return True
         elif self.lower == other.lower and self.is_one_off_child and not other.is_one_off_child:
@@ -231,6 +224,8 @@ class Node:
     def __le__(self, other):
         if not isinstance(other, Node):
             raise TypeError('Can only compare two Nodes')
+        if not self.feasible:
+            return True
         if self.lower < other.lower:
             return True
         elif self.lower == other.lower and self.is_one_off_child and not other.is_one_off_child:

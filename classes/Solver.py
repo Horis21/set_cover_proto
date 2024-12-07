@@ -11,6 +11,7 @@ from classes.Cache import HashableDataFrame
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics import pairwise_distances
 from sklearn.metrics import pairwise_distances_argmin_min
+import gc
 import sys
 
 class Solver:
@@ -363,6 +364,7 @@ class Solver:
                 node.upper = solution.upper
                 node.improving = solution.improving
                 node.link_and_prune(solution, self.cache)
+                node.best = node
                 continue
         
             explored += 1 #Only updated explored nodes if not a leaf and not in cache
@@ -412,5 +414,6 @@ class Solver:
                     pq.put(child)
 
                 node.backpropagate(self.cache)
+
         size, depth = root.print_solution()
         return size, depth, explored
