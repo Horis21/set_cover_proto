@@ -198,21 +198,20 @@ class Solver:
         else:
             return False
 
-    def transformTree(self, df, node_id, tree, parent=None, isLeft = None):
+    def transformTree(self, node_id, tree, parent=None, isLeft = None):
         if tree is None:
-            return Node(df, None, parent, isLeft)
+            return Node(parent =  parent,isLeft = isLeft)
         # Create a new node object
         if tree.children_left[node_id] != tree.children_right[node_id]:  # It's a decision node
             feature = tree.feature[node_id]
-            new_node = Node(df = df, parent_feat = None, parent=parent, isLeft = isLeft)
+            new_node = Node(parent=parent, isLeft = isLeft)
             new_node.f = feature
             if parent is not None:
                 new_node.parent_feat = parent.f
             
-            left_df, right_df = self.split(df, feature)
             # Recursively create left and right children
-            left_child = self.transformTree(left_df, tree.children_left[node_id],tree ,new_node, True)
-            right_child = self.transformTree(right_df, tree.children_right[node_id],tree, new_node, False)
+            left_child = self.transformTree(tree.children_left[node_id],tree ,new_node, True)
+            right_child = self.transformTree(tree.children_right[node_id],tree, new_node, False)
 
             left_child.parent_feat = feature
             right_child.parent_feat = feature
@@ -225,7 +224,7 @@ class Solver:
             new_node.right = right_child
 
         else:  # It's a leaf node
-            new_node = Node(df = df, parent_feat = parent.f, parent= parent, isLeft = isLeft)
+            new_node = Node(parent_feat = parent.f, parent= parent, isLeft = isLeft)
         
         return new_node
 
@@ -313,11 +312,9 @@ class Solver:
             cart = self.fast_forward(data) #Compute fast forward upper bound
             ff = cart.get_n_leaves() - 1 if cart is not None else 0
 
-
             self.cache.put_upper(data, ff)
-            best = self.transformTree(node.df, 0, cart.tree_, node.parent, node.isLeft)
+            best = self.transformTree(0, cart.tree_, node.parent, node.isLeft)
             self.cache.put_best(data, best)
-            node.best = best
         node.put_node_upper(self.cache.get_upper(data)) #Add the dataset upper bound to the node upper bound
         node.best = self.cache.get_best(data)
         node.best.parent_feat = node.parent_feat
@@ -341,6 +338,7 @@ class Solver:
         node.put_node_lower(0)
         node.put_node_upper(0)
         self.cache.put_upper(node.df, 0)
+        self.df = None
         node.mark_ready(self.cache)
 
     def solve(self, orig_df):
@@ -364,8 +362,6 @@ class Solver:
                 node.lower = solution.lower
                 node.upper = solution.upper
                 node.improving = solution.improving
-                node.f = solution.f
-                node.save_best(solution.f, solution)
                 node.link_and_prune(solution, self.cache)
                 continue
         
@@ -407,7 +403,8 @@ class Solver:
                     node.mark_ready(self.cache)
                     early_solution = True
                     break #solution found here no need to search further
-
+            
+        
             if not early_solution:
                 for child in need_LB:
                     self.computeLB(child)

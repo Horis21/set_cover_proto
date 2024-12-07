@@ -1,8 +1,9 @@
+import copy
 import queue
 from classes.Cache import Cache
 
 class Node:
-    def __init__(self, df, parent_feat = None, parent = None ,isLeft = None, is_one_off_child = None, set_cover_counts = None):
+    def __init__(self, df = None, parent_feat = None, parent = None ,isLeft = None, is_one_off_child = None, set_cover_counts = None):
         self.df = df
         self.parent_feat = parent_feat
         self.isLeft = isLeft
@@ -24,8 +25,8 @@ class Node:
         if not self.feasible:
             return
         
-        if self.update_local_bounds(cache) and self.parent is not None:
-             parent = self.parent
+        parent = self.parent
+        if self.update_local_bounds(cache) and parent is not None:
              parent.backpropagate(cache) #Backpropagate further only if bounds were updated
 
 
@@ -40,9 +41,9 @@ class Node:
         self.cut_branches() # Found solution no need to search anymore            
         
     #Mark subproblem solved
-    def mark_ready(self, cache : Cache):
-        if self.f is  None:
-            self.best = self
+    def mark_ready(self, cache : Cache):        
+        self.best = self
+        
         cache.put_solution(self.df, self)
         
         
@@ -71,6 +72,14 @@ class Node:
         self.improving = min(self.improving, parent.improving - sibling.lower, self.upper-1)
 
     def update_local_bounds(self, cache : Cache):
+        if self.df is None:
+            print(self.parent)
+            print(self.best)
+            print(self.left)
+            print(self.right)
+            print(self.lower)
+            print(self.upper)
+
         childrenUpper = 20000000
         childrenLower = 20000000
 
@@ -129,6 +138,7 @@ class Node:
             if self.lower == self.upper:
                 self.mark_ready(cache) #Only if optimal solution is verified
 
+            return False
         else:
             for feature in pos_features:
                 left = self.lefts[feature]
@@ -138,18 +148,18 @@ class Node:
                     left.cut_branches()
                     right.cut_branches()
 
-
         return True
 
         
     def cut_branches(self):
         self.feasible = False
+        self.df = None
+        self.best = None
+        self.parent = None
         for left in self.lefts.values():
             left.cut_branches()
-            left.parent = None
         for right in self.rights.values():
             right.cut_branches()
-            right.parent = None
         self.lefts = {}
         self.rights = {}
 

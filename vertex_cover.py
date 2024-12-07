@@ -2,12 +2,14 @@ from classes.Solver import Solver
 import time
 import pandas as pd
 import gc
+from wakepy import keep
 
 if __name__ == "__main__":
     df = pd.read_csv("data/monk3_bin.csv", sep=" ", header=None)
     #df = pd.read_csv("test.csv", sep=" ", header=None)
     solver = Solver()
-    print(solver.solve(df))
+    with keep.running():
+        print(solver.solve(df))
     # names = ['diabetes', 'australian-credit','german-credit','hepatitis']
     # sample_sizes = [50,100,150,200]
     # gaps = [0.05,0.1,0.15,0.2,0.3]
