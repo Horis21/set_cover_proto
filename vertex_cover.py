@@ -1,7 +1,6 @@
 from classes.Solver import Solver
 import time
 import pandas as pd
-import gc
 from wakepy import keep
 
 if __name__ == "__main__":
