@@ -44,6 +44,7 @@ class Solver:
     def find_vertex_cover(self, diff_df, verbose=True):
         model = grb.Model("set_cover")
         if not verbose:
+            model.setParam('OutputFlag', 0)
             model.Params.LogToConsole = 0
         
         model.setParam('MIPGap', self.MIP_gap)

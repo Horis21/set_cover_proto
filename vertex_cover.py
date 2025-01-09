@@ -4,8 +4,8 @@ import pandas as pd
 from wakepy import keep
 
 if __name__ == "__main__":
-    #df = pd.read_csv("data/monk3_bin.csv", sep=" ", header=None)
-    df = pd.read_csv("test.csv", sep=" ", header=None)
+    df = pd.read_csv("data/monk3_bin.csv", sep=" ", header=None)
+    #df = pd.read_csv("test.csv", sep=" ", header=None)
     solver = Solver()
     with keep.running():
         print(solver.solve(df))
