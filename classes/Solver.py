@@ -15,32 +15,90 @@ import gc
 import sys
 
 class Solver:
-    def __init__(self, sample_size = 200, MIP_gap = 0.05, cover_runs = 1, lower_bound_strategy = 'both'):
+    def __init__(self, sample_size = 1500, MIP_gap = 0.05, cover_runs = 1, lower_bound_strategy = 'both'):
         self.sample_size = sample_size
         self.MIP_gap = MIP_gap
         self.cover_runs = cover_runs
         self.lower_bound_strategy = lower_bound_strategy
         self.cache = Cache()
 
-    def get_difference_table(self, df):
+    def split_differnce_table(self, node : Node, feat):
+        parent_dt = node.dt
+
+        left_dt = {}
+        right_dt = {}
+
+        for dif in parent_dt.keys():
+            if dif[feat] != 0:
+                continue # Rows in the dt that mark a difference in the splitting feature are removed by splitting
+
+            for feats in parent_dt[dif]:
+                if feats[feat] == 0:
+                    if left_dt.get(dif) is None:
+                        left_dt[dif] = set()
+
+                    # This row in the dt will also be present in the left's child dt
+                    left_dt[dif].add(feats)
+
+                else:
+                    if right_dt.get(dif) is None:
+                        right_dt[dif] = set()
+
+                    # Same for right child case
+                    right_dt[dif].add(feats)
+
+
+        # Save dts after splitting
+        node.lefts[feat].dt = left_dt
+        node.rights[feat].dt = right_dt
+
+        
+
+
+    def get_difference_table(self, node : Node):
+        if node.parent is None: #Always compoute dt for root
+            self.compute_difference_table(node)
+
+        elif not node.dt: #Instead of computing from 0, use parent's dt for faster computation
+            self.split_differnce_table(node.parent, node.parent_feat)
+
+        return self.get_dt(node)
+
+
+    def get_dt(self, node : Node):
+        return pd.DataFrame(node.dt.keys())      
+
+
+
+    def compute_difference_table(self, node : Node):
+        df = node.df
         # Split positive and negative instances (column 0 is the label)
         pos = df[df[0] == 1]
         neg = df[df[0] == 0]
 
         # for every positive instance, and for every negative instance, compute the differences using XOR
-        diffs = []
         for i, row1 in pos.iterrows():
             for j, row2 in neg.iterrows():
                 dif = np.logical_xor(row1[1:], row2[1:]) # exclude label column
                 if sum(dif) == 0: continue # Do not add rows that are identical. We can never split these two instances
-                diffs.append(dif)
-        
-        if len(diffs) == 0:
-            print("coaie")
-            print(df)
-        diff_df = pd.concat(diffs, axis=1).T
-        return diff_df
+                dif_tuple = tuple(dif)  # Convert to tuple for hashing
+                feats = []
+                
+                for i, x in enumerate(dif_tuple):
+                    if x == 0: # If the two rows are equal in a feature value, save what is the value that they both have
+                        feats.append(row1[i+1])
+                    else: #I don't care otherwise, but makes indexing easier
+                        feats.append(0) 
 
+                if node.dt.get(dif_tuple) is None:
+                    node.dt[dif_tuple] = set()
+
+                # For each row in the DT save all possible feature value combinations where two rows are equal            
+                node.dt[dif_tuple].add(tuple(feats))
+
+
+        
+    
     def find_vertex_cover(self, diff_df, verbose=True):
         model = grb.Model("set_cover")
         if not verbose:
@@ -62,10 +120,14 @@ class Solver:
             model.addConstr(quicksum(x[j] for j, val in enumerate(row) if val) >= 1, f"cover_{i}")
 
         # Solve
+        #model = model.relax()
         model.optimize()
 
         # Retrieve solution
         if model.status == GRB.OPTIMAL:
+             # Access relaxed variable values
+            # relaxed_vars = model.getVars()  # This gets all variables in the relaxed model
+            # selected_subsets = [j for j, var in enumerate(relaxed_vars) if var.X > 0.5]
             selected_subsets = [j for j, var in x.items() if var.X > 0.5]
             return selected_subsets
         else:
@@ -88,6 +150,9 @@ class Solver:
             print("final sample is empty")
             print(df)
         return sample
+    
+    def get_random_sample(self, df):
+        return df if df.shape[0] <= self.sample_size else df.sample(self.sample_size)
 
     def apply_clustering(self, df, cluster_size):
         if df.size == 0:
@@ -130,15 +195,17 @@ class Solver:
             print(df)
         return representative_samples
 
-    def vertex_cover_features(self, df):
+    def vertex_cover_features(self, node : Node):
+        df = node.df
         lower_bound = 0
         counts = np.zeros(df.shape[1] - 1, dtype=int)
         # repeat multiple times
         for i in range(self.cover_runs):
             # Get a random sample from the rows (This could be improved by using clustering)
-            sample = self.get_sample(df)
-            diff_table = self.get_difference_table(sample)
-            features = self.find_vertex_cover(diff_table, verbose=False)
+            #sample = self.get_sample(df)
+            diff_table = self.get_difference_table(node)
+            sample = self.get_random_sample(diff_table)
+            features = self.find_vertex_cover(sample, verbose=False)
             # the lower bound is the maximum of all the lower bounds we have obtained
             if len(features) > lower_bound:
                 lower_bound = len(features)
@@ -289,7 +356,10 @@ class Solver:
             return features
         
     #Return one_offs, cover_features and vertex cover lower bound    
-    def get_features(self, df, parent = None, feature = None):
+    def get_features(self, node : Node):
+        df = node.df
+        parent = node.parent
+        feature = node.parent_feat
         one_offs = self.cache.get_one_offs(df)
         if one_offs is None and (self.lower_bound_strategy == 'one-off' or self.lower_bound_strategy == 'both'):
             if parent is None:
@@ -303,7 +373,7 @@ class Solver:
         cover_features = self.cache.get_vertex_cover(df)
         vclb = 0
         if cover_features is None and (self.lower_bound_strategy == 'set-cover' or self.lower_bound_strategy == 'both'):
-            cover_features, vclb = self.vertex_cover_features(df)
+            cover_features, vclb = self.vertex_cover_features(node)
             self.cache.put_vertex_cover(df, cover_features)
         return one_offs, cover_features, vclb
         
@@ -324,7 +394,7 @@ class Solver:
     def computeLB(self, node: Node):
         data = node.df     
         if self.cache.get_lower(data) is None:
-            one_offs, cover_features, vclb = self.get_features(data, node.parent, node.parent_feat)
+            one_offs, cover_features, vclb = self.get_features(node)
             if self.lower_bound_strategy == 'both':     
                 llb = max(len(one_offs), vclb)
             elif self.lower_bound_strategy == 'one-off':
@@ -376,7 +446,7 @@ class Solver:
             #Search for all features
             pos_features = self.possible_features(data, node.parent)
 
-            one_offs, cover_features, vclb = self.get_features(data)
+            one_offs, cover_features, vclb = self.get_features(node)
             for i in pos_features:
                 #Split the data based on feature i
                 left_df, right_df = self.split(data, i)

@@ -1,14 +1,21 @@
 from classes.Solver import Solver
 import time
+import pstats
+import cProfile
 import pandas as pd
 from wakepy import keep
 
 if __name__ == "__main__":
+    #df = pd.read_csv("data/diabetes.csv", sep=" ", header=None)
     df = pd.read_csv("data/monk3_bin.csv", sep=" ", header=None)
     #df = pd.read_csv("test.csv", sep=" ", header=None)
-    solver = Solver()
-    with keep.running():
+    solver = Solver(MIP_gap=0.2)
+    with cProfile.Profile() as profile:
         print(solver.solve(df))
+
+        results = pstats.Stats(profile)
+        results.sort_stats(pstats.SortKey.CUMULATIVE)
+        results.print_stats()
     # names = ['diabetes', 'australian-credit','german-credit','hepatitis']
     # sample_sizes = [50,100,150,200]
     # gaps = [0.05,0.1,0.15,0.2,0.3]
@@ -18,8 +25,7 @@ if __name__ == "__main__":
     # # Initialize an empty DataFrame to store results
     
     # for name in names:
-    #     results = pd.DataFrame(columns=[
-    #     'name', 'sample_size', 'gap','nr_runs', 'strategy', 'size', 'depth', 'explored', 'elapsed_time'
+    #     results = pd.DataFrame(columns=[    #     'name', 'sample_size', 'gap','nr_runs', 'strategy', 'size', 'depth', 'explored', 'elapsed_time'
     #     ])
     #     filename = 'data/' + name + '.csv'
     #     output_csv = name + '_binary_classification_results.csv'

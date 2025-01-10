@@ -10,6 +10,7 @@ class Node:
         self.upper = 20000000
         self.improving = 20000000
         self.lower = 0
+        self.dt = {}
         self.feasible = True
         self.is_one_off_child = is_one_off_child
         self.set_cover_counts = set_cover_counts
