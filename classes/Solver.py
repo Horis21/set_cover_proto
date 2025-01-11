@@ -15,7 +15,7 @@ import gc
 import sys
 
 class Solver:
-    def __init__(self, sample_size = 1500, MIP_gap = 0.05, cover_runs = 1, lower_bound_strategy = 'both'):
+    def __init__(self, sample_size = 15000, MIP_gap = 0.05, cover_runs = 1, lower_bound_strategy = 'both'):
         self.sample_size = sample_size
         self.MIP_gap = MIP_gap
         self.cover_runs = cover_runs
@@ -62,6 +62,7 @@ class Solver:
         elif not node.dt: #Instead of computing from 0, use parent's dt for faster computation
             self.split_differnce_table(node.parent, node.parent_feat)
 
+        self.cache.put_dt(node.df, node.dt)
         return self.get_dt(node)
 
 
@@ -83,10 +84,10 @@ class Solver:
                 if sum(dif) == 0: continue # Do not add rows that are identical. We can never split these two instances
                 dif_tuple = tuple(dif)  # Convert to tuple for hashing
                 feats = []
-                
+
                 for i, x in enumerate(dif_tuple):
                     if x == 0: # If the two rows are equal in a feature value, save what is the value that they both have
-                        feats.append(row1[i+1])
+                        feats.append(row1[i+1].item())
                     else: #I don't care otherwise, but makes indexing easier
                         feats.append(0) 
 
@@ -120,7 +121,7 @@ class Solver:
             model.addConstr(quicksum(x[j] for j, val in enumerate(row) if val) >= 1, f"cover_{i}")
 
         # Solve
-        #model = model.relax()
+        # model = model.relax()
         model.optimize()
 
         # Retrieve solution
@@ -165,7 +166,9 @@ class Solver:
 
 
         # Apply Agglomerative Clustering with Hamming distance
-        #clustering = AgglomerativeClustering(n_clusters=cluster_size, affinity='precomputed', linkage = 'average')
+        # Use in DelftBlue
+        #clustering = AgglomerativeClustering(n_clusters=cluster_size, affinity='precomputed', linkage = 'average') 
+        # Otherwise
         clustering = AgglomerativeClustering(n_clusters=cluster_size, metric='precomputed', linkage = 'average')
         
         # Compute the pairwise Hamming distance matrix
@@ -206,6 +209,7 @@ class Solver:
             diff_table = self.get_difference_table(node)
             sample = self.get_random_sample(diff_table)
             features = self.find_vertex_cover(sample, verbose=False)
+
             # the lower bound is the maximum of all the lower bounds we have obtained
             if len(features) > lower_bound:
                 lower_bound = len(features)
@@ -402,6 +406,8 @@ class Solver:
             elif self.lower_bound_strategy == 'set-cover':
                 llb = vclb
             self.cache.put_lower(data, llb) #Add lower bound based on vertex cover and one_offs
+        else:
+            node.dt = self.cache.get_dt(node.df)
         node.put_node_lower(self.cache.get_lower(data))
 
 
@@ -485,6 +491,7 @@ class Solver:
                     pq.put(child)
 
                 node.backpropagate(self.cache)
+
 
         size, depth = root.print_solution()
         return size, depth, explored

@@ -50,6 +50,13 @@ class Cache:
         self.vertex_cover = {}
         self.possible_feats = {}
         self.bests = {}
+        self.dts = {}
+
+    def put_dt(self, df, dt):
+        self.dts[hash(df)] = dt
+
+    def get_dt(self, df):
+        return self.dts[hash(df)]
 
     def get_best(self, df):
         return self.bests.get(hash(df))
@@ -99,3 +106,4 @@ class Cache:
               self.upper[hash(df)] = bound
               return True
         return False
+
