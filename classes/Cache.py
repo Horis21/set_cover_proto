@@ -47,7 +47,7 @@ class Cache:
         self.lower = {}
         self.solution = {}
         self.one_off = {}
-        self.vertex_cover = {}
+        self.set_cover = {}
         self.possible_feats = {}
         self.bests = {}
         self.dts = {}
@@ -76,11 +76,11 @@ class Cache:
     def put_one_offs(self, df, one_offs):
          self.one_off[hash(df)] = one_offs
 
-    def get_vertex_cover(self, df):
-        return self.vertex_cover.get(hash(df))
+    def get_set_cover(self, df):
+        return self.set_cover.get(hash(df))
     
-    def put_vertex_cover(self, df, vertex_cover):
-         self.vertex_cover[hash(df)] = vertex_cover
+    def put_set_cover(self, df, set_cover):
+         self.set_cover[hash(df)] = set_cover
 
     def get_solution(self, df):
         return self.solution.get(hash(df))

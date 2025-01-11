@@ -7,8 +7,8 @@ from wakepy import keep
 
 if __name__ == "__main__":
     #df = pd.read_csv("data/diabetes.csv", sep=" ", header=None)
-    #df = pd.read_csv("data/monk3_bin.csv", sep=" ", header=None)
-    df = pd.read_csv("data/hepatitis.csv", sep=" ", header=None)
+    df = pd.read_csv("data/monk3_bin.csv", sep=" ", header=None)
+    #df = pd.read_csv("data/hepatitis.csv", sep=" ", header=None)
     #df = pd.read_csv("test.csv", sep=" ", header=None)
     solver = Solver(sample_size=5000, MIP_gap=0.2)
     with cProfile.Profile() as profile:

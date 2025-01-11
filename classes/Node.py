@@ -22,44 +22,50 @@ class Node:
         self.parent = parent
 
     def backpropagate(self, cache : Cache):
-        if not self.feasible:
-            return
-        
         parent = self.parent
-        if self.update_local_bounds(cache) and parent is not None:
+        if self.update_local_bounds(cache) and parent is not None: # Update local bounds
              parent.backpropagate(cache) #Backpropagate further only if bounds were updated
 
 
     def link_and_prune(self, solution, cache : Cache):
+        # Save the optimal feature left and right children that occur after splitting on it
+        self.f = solution.f
         self.left = solution.left
         self.right = solution.right
         
-        self.f = solution.f
-
+        # Backpropagate the now solved now
         if self.parent is not None:
             self.parent.backpropagate(cache)
-        self.cut_branches() # Found solution no need to search anymore            
+        self.cut_branches() # Found solution no need to search anymore in this subtree         
         
     #Mark subproblem solved
     def mark_ready(self, cache : Cache): 
-        self.parent = None       
-        self.best = self #Sanity check
+
+        self.parent = None # Remove reference to parent so garbage collector can pick the node up if it become infeasible later on (possiblt not needed)       
+        self.best = self #Sanity check to ensure solution stored in the cache have a best tree saved. Also helps garbahe collector as less distinct nodes are referenced
         
+        # Store solution in cache
         cache.put_solution(self.df, self)
         
         
     def save_best(self, f, from_sol = None):
+        # Save the best feature to split found so far
         self.best.f = f
-        if from_sol is None:
+
+        
+        if from_sol is None: # Save the best left and right children after splitting
             self.best.left = self.lefts[f].best
             self.best.right = self.rights[f].best
-        else:
+        else: # Else if this function is called for linking with a solution stored in the cache, then update with the left and right children that the solution has. The lef and right chuildren objects of the original node are not fully solved yet
             self.best.left = from_sol.left
             self.best.right = from_sol.right
+
+        # Also save the best bounds
         self.best.lower = self.lower
         self.best.upper = self.upper
 
     def update_improving(self):
+        # If root node, then the improving UB = best solution found so far -1. This value gets put in the improving bound when updating the UB (put_node_upper method)
         if self.parent is None:
             return 
         parent = self.parent
@@ -70,91 +76,101 @@ class Node:
         else:
             sibling = parent.lefts[f]
 
+        # Compute the improving bound with the sibling LB and parent improving UB
         self.improving = min(self.improving, parent.improving - sibling.lower, self.upper-1)
 
     def update_local_bounds(self, cache : Cache):
+        # Initilaize UB and LB that come from the children nodes with infeasibly high values
         childrenUpper = 20000000
         childrenLower = 20000000
 
+        # Flag for whether bounds got updated
         updated = False
 
+        # Check if there is a better UB in the cache
         cachedUB = cache.get_upper(self.df)
         if cachedUB < self.upper:
             self.upper = cachedUB
-            self.best = cache.get_best(self.df)
+            self.best = cache.get_best(self.df) # Also get the best solution so far, since there is a better bound in the cache, it means that a better solution has been found
         
             updated = True
 
-
+        # For all splitting features
         pos_features = cache.get_possbile_feats(self.df)
-        #This could be optimized in a future versions by checking if bounds for all childs have been added and only checking 
-        # if the bound for the feature we are updating is changing the bound for the whole node
         for feature in pos_features:
             left = self.lefts[feature]
             right =  self.rights[feature]
 
-            upperBound = left.upper + right.upper + 1
+            upperBound = left.upper + right.upper + 1 # classic UB
 
-            if upperBound < childrenUpper:
-                childrenUpper = upperBound
-                best_feat = feature
+            if upperBound < childrenUpper: # If this is the best solution found so far
+                childrenUpper = upperBound 
+                best_feat = feature # Store the feature responsible
 
             childrenLower = min(childrenLower,  left.lower + right.upper + 1)
 
         #New best solution found
-        if childrenUpper < self.upper:  
-            self.save_best(best_feat)
-            self.put_node_upper(childrenUpper)
-            if cache.put_upper(self.df, childrenUpper):
-                cache.put_best(self.df, self.best) # Only if it's better than that we have in the cache (everytime anyway I think)
+        if childrenUpper < self.upper:  # If we found a better solution
+            self.save_best(best_feat) # Save best solution
+            self.put_node_upper(childrenUpper) # Store the solution size
+            if cache.put_upper(self.df, childrenUpper): # Update the cache
+                cache.put_best(self.df, self.best) # Only if it's better than that we have in the cache (should always be true as no multi threading or paralization yet)
             updated = True
 
+        # Same with the lower bound, store and update
         if childrenLower > self.lower:
             cache.put_lower(self.df, childrenLower)
             self.put_node_lower(childrenLower)
             updated = True
 
+        # Update the improving bound of the node. This will be useful for pruning now infeasible children. I think this also must be done after the previous computations as to have the most up-to-date UB
         self.update_improving()
 
-        if not updated:
+        if not updated: # If no bounds were updated stop backpropagation
             return False
 
+        # Print when root bounds get updated
         if self.parent is None:
             print(f"Updated local bounds for root lower = {self.lower}, upper = {self.upper}")
 
-        #Cannot improve anymore
+        #Cannot improve anymore if ..
         if self.lower == self.upper or self.lower > self.improving:
             if self.parent is None:
                 print("found root solution")
-            self.link_and_prune(self.best, cache)
+            self.link_and_prune(self.best, cache) # Save best solution for this node
             if self.lower == self.upper:
-                self.mark_ready(cache) #Only if optimal solution is verified
+                self.mark_ready(cache) #Store solution in cache / mark node as solved only if UB == LB, otherwise we just ran out of nodes to use
 
-            return False
-        else:
+            return False # Return false simply because link_and_prune also forwards the propgation, so no need to do it twice
+        else: # If we can still improve, prune infeasible children
             for feature in pos_features:
                 left = self.lefts[feature]
                 right =  self.rights[feature]
 
-                if left.lower + right.lower + 1 > self.improving:
+                if left.lower + right.lower + 1 > self.improving: # If LB > improving, no need to ever explore
                     left.cut_branches()
                     right.cut_branches()
 
-        return True
+        return True # continue backpropagation
 
-        
+    # Method that prunes a subtree
     def cut_branches(self):
-        self.feasible = False
-        self.df = None
-        self.best = self
-        self.parent = None
+        self.feasible = False # Mark node as infeasible
+        self.df = None # Remove the dataframe reference so garbage collector could maybe hopefully pick it up
+        self.best = self # We still need to save the best solution, since we will be cutting the branches off of solved subtrees as well. Maybe two different branch cutting methods would be more adequate
+        self.parent = None # Remove reference to parent for garbage collector
+
+        # Prune all children as well
         for left in self.lefts.values():
-            left.cut_branches()
+            left.cut_branches() 
         for right in self.rights.values():
             right.cut_branches()
+
+        # Remove references to children
         self.lefts = {}
         self.rights = {}
 
+    # Some printing 
     def print_solution(self):
         size = 0
         depth = 0
@@ -177,7 +193,7 @@ class Node:
 
     def put_node_upper(self, bound):
         previous_upper = self.upper
-        self.improving = min(self.improving, bound-1)
+        self.improving = min(self.improving, bound-1) # Also update improving bound
         self.upper = min(self.upper, bound)
         # if self.upper != previous_upper:
         #     print(f"Updated node upper bound:node = {str(self)}, new upper = {self.upper}")

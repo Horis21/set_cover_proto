@@ -25,22 +25,24 @@ class Solver:
     def split_differnce_table(self, node : Node, feat):
         parent_dt = node.dt
 
+        # Initialize empty dictionaries
         left_dt = {}
         right_dt = {}
 
-        for dif in parent_dt.keys():
+        for dif in parent_dt.keys(): # For each row in the difference table
             if dif[feat] != 0:
-                continue # Rows in the dt that mark a difference in the splitting feature are removed by splitting
+                continue # Rows in the dt that mark a difference in the splitting feature are removed by splitting so they won't appear in either children difference table
 
+            # Go through all saved feature values for the dt row. Here each value represents the feature value (0 or 1) that both feature vectors from the dataset had the same i.e. a ZERO in the difference table
             for feats in parent_dt[dif]:
-                if feats[feat] == 0:
+                if feats[feat] == 0: # If they both had a zero, put in the left_dt
                     if left_dt.get(dif) is None:
                         left_dt[dif] = set()
 
                     # This row in the dt will also be present in the left's child dt
                     left_dt[dif].add(feats)
 
-                else:
+                else: # Otherwise in right difference table
                     if right_dt.get(dif) is None:
                         right_dt[dif] = set()
 
@@ -56,17 +58,19 @@ class Solver:
 
 
     def get_difference_table(self, node : Node):
-        if node.parent is None: #Always compoute dt for root
+        if node.parent is None: #Always compoute dt for root from scratch
             self.compute_difference_table(node)
 
         elif not node.dt: #Instead of computing from 0, use parent's dt for faster computation
             self.split_differnce_table(node.parent, node.parent_feat)
 
+        # Store it in the cahce
         self.cache.put_dt(node.df, node.dt)
         return self.get_dt(node)
 
 
     def get_dt(self, node : Node):
+        # Create a pd.Dataframe from all the keuys from the difference table dictionary object.
         return pd.DataFrame(node.dt.keys())      
 
 
@@ -83,8 +87,11 @@ class Solver:
                 dif = np.logical_xor(row1[1:], row2[1:]) # exclude label column
                 if sum(dif) == 0: continue # Do not add rows that are identical. We can never split these two instances
                 dif_tuple = tuple(dif)  # Convert to tuple for hashing
+
+                # Initialize list for storing feature values where the two rows have the same value i.e.: a zero in the difference table
                 feats = []
 
+                # Go through all the values in the difference
                 for i, x in enumerate(dif_tuple):
                     if x == 0: # If the two rows are equal in a feature value, save what is the value that they both have
                         feats.append(row1[i+1].item())
@@ -92,15 +99,15 @@ class Solver:
                         feats.append(0) 
 
                 if node.dt.get(dif_tuple) is None:
-                    node.dt[dif_tuple] = set()
+                    node.dt[dif_tuple] = set() # Use a set to store all distinct lists of same feature values for each row in the difference table
 
-                # For each row in the DT save all possible feature value combinations where two rows are equal            
+                # For each row in the DT save all possible feature value combinations where two rows are equal. Save them in a dictionary to ensure unique rows in the difference table           
                 node.dt[dif_tuple].add(tuple(feats))
 
 
         
     
-    def find_vertex_cover(self, diff_df, verbose=True):
+    def find_set_cover(self, diff_df, verbose=True):
         model = grb.Model("set_cover")
         if not verbose:
             model.setParam('OutputFlag', 0)
@@ -139,13 +146,13 @@ class Solver:
         if df.size == 0:
             print("get sample df  is empty")
         labels = np.unique(df[0].values)
-        cluster_size = int(np.floor(self.sample_size / len(labels)))
+        cluster_size = int(np.floor(self.sample_size / len(labels))) # Generate balanced clusters
 
         sample = pd.DataFrame()
-        for label in labels:
-            class_points = df[df[0] == label]
-            clustered_points = self.apply_clustering(class_points, cluster_size)
-            sample = pd.concat([sample, clustered_points])
+        for label in labels: # For each class compute a cluster
+            class_points = df[df[0] == label] # Get all points from the class
+            clustered_points = self.apply_clustering(class_points, cluster_size) # Apply clustering algo
+            sample = pd.concat([sample, clustered_points]) # Add them to the sample
 
         if sample.size == 0:
             print("final sample is empty")
@@ -153,11 +160,14 @@ class Solver:
         return sample
     
     def get_random_sample(self, df):
+        # Random sample alternative
         return df if df.shape[0] <= self.sample_size else df.sample(self.sample_size)
 
     def apply_clustering(self, df, cluster_size):
         if df.size == 0:
             print("applying clustering on empty sample")
+
+        # If not enough points from this class, then just return all of them
         if df.shape[0] <= cluster_size:
             return df
         
@@ -166,7 +176,8 @@ class Solver:
 
 
         # Apply Agglomerative Clustering with Hamming distance
-        # Use in DelftBlue
+
+        # DelftBlue syntax
         #clustering = AgglomerativeClustering(n_clusters=cluster_size, affinity='precomputed', linkage = 'average') 
         # Otherwise
         clustering = AgglomerativeClustering(n_clusters=cluster_size, metric='precomputed', linkage = 'average')
@@ -198,17 +209,17 @@ class Solver:
             print(df)
         return representative_samples
 
-    def vertex_cover_features(self, node : Node):
+    def set_cover_features(self, node : Node):
         df = node.df
         lower_bound = 0
         counts = np.zeros(df.shape[1] - 1, dtype=int)
         # repeat multiple times
         for i in range(self.cover_runs):
-            # Get a random sample from the rows (This could be improved by using clustering)
+            # Get a random sample from the rows of the difference table (This could be improved by using clustering)
             #sample = self.get_sample(df)
             diff_table = self.get_difference_table(node)
             sample = self.get_random_sample(diff_table)
-            features = self.find_vertex_cover(sample, verbose=False)
+            features = self.find_set_cover(sample, verbose=False)
 
             # the lower bound is the maximum of all the lower bounds we have obtained
             if len(features) > lower_bound:
@@ -233,12 +244,14 @@ class Solver:
         
     def one_off_features(self, df):
         pos_features = self.possible_features(df)
+
+        # Split positive and negative instances (column 0 is the label)
         pos = set(tuple(x) for x in df[df[0] == 1].values)
         neg = set(tuple(x) for x in df[df[0] == 0].values)
 
-        ignore_feaures = set()
-        features = []
+        features = set() # Initialize one-off features foubd as a set
 
+        # Search from the class with least number of instances
         if len(pos) < len(neg):
             search = pos
             opp = neg
@@ -248,17 +261,16 @@ class Solver:
         
         for row in search:
             for f in pos_features:
-                if f in ignore_feaures: #If we already found a one-off based on this feature continue
+                if f in features: #If we already found a one-off based on this feature continue
                     continue
                 new_row = np.copy(row)
                 new_row[f+1] = np.logical_xor(1, new_row[f+1]) #Compute the off-by-one feature vector
                 new_row[0] = np.logical_xor(1, new_row[0])
                 new_row = tuple(new_row)
-                #Check in the opposing class
+                #Check in the opposing class if it exists and add to the found features
                 if opp.__contains__(new_row):
-                    features.append(f)
-                    ignore_feaures.add(f)
-        return features
+                    features.add(f)
+        return list(features)
 
     #Split data based on feature f
     def split(self, df, f):
@@ -312,17 +324,19 @@ class Solver:
             return cart
         
     def possible_features(self, df, parent = None):
+            # Check if already in cache
             features = self.cache.get_possbile_feats(df)
             if features is not None:
                 return features
         
+            # Initialize with all features in the dataset
             features = set([i for i in range(df.shape[1]-1)])
             features_present = np.zeros(df.shape[1]-1)
             features_always_present = np.ones(df.shape[1]-1)
 
             for i, row in df.iterrows():
-                features_present = np.logical_or(features_present, row[1:])
-                features_always_present = np.logical_and(features_always_present, row[1:])
+                features_present = np.logical_or(features_present, row[1:]) # Mark features that are present at least once in the dataset (OR)
+                features_always_present = np.logical_and(features_always_present, row[1:]) # Mark features that are always present in the dataset (AND)
 
             for i, f in enumerate(features_present):
                 if not f: 
@@ -332,17 +346,19 @@ class Solver:
                 if f: 
                     features.remove(i) #Remove all features that are present in all instances
 
+            # Get the possible features of the present node, and compute intersection to remove features that weren't possible for the parent and therefore, won't be in the child as well. This speeds up the next part
             if parent is not None:
-                parent_pos_feats = self.cache.get_possbile_feats(parent.df)
-                features = set(features) & set(parent_pos_feats)
+                parent_possible_feats = self.cache.get_possbile_feats(parent.df)
+                features = set(features) & set(parent_possible_feats)
 
+            # Iterate collumns to remove duplicat or complementary features among columns
             cols = set()
             for i, col in enumerate(df.columns[1:]):
                 if i not in features:
                     continue #Don't bother with already ignored features
 
                 if col in cols:
-                    features.remove(i) #Redundant feature
+                    features.remove(i) #Redundant feature, since the column is already present in the set
                 else:
                     cols.add(col)
             
@@ -354,32 +370,35 @@ class Solver:
                 complement = np.logical_xor(col,col)
                 if complement in cols: #Check if the complement of this feature exists
                     features.remove(i)
-                    cols.remove(col) #Remove so that we don't remove the complement as well
+                    cols.remove(col) #Remove so that we don't remove the complement as well, when we get to the feature
 
             self.cache.put_possible_feats(df, features)
             return features
         
-    #Return one_offs, cover_features and vertex cover lower bound    
+    #Return one_offs, cover_features and set cover lower bound    
     def get_features(self, node : Node):
         df = node.df
         parent = node.parent
-        feature = node.parent_feat
+        feature = node.parent_feat # This is the feature that the parent splits on to create this current node
         one_offs = self.cache.get_one_offs(df)
         if one_offs is None and (self.lower_bound_strategy == 'one-off' or self.lower_bound_strategy == 'both'):
             if parent is None:
+                # Compute one-off features from scratch for the root node
                 one_offs = self.one_off_features(df)
                 self.cache.put_one_offs(df, one_offs)
             else:
+                # Otherwise simply remove the parent_feat from the list, since it was used to split 
                 one_offs = self.cache.get_one_offs(parent.df)
                 if feature in one_offs:
                     one_offs.remove(feature)
                 self.cache.put_one_offs(df, one_offs)
-        cover_features = self.cache.get_vertex_cover(df)
-        vclb = 0
+        cover_features = self.cache.get_set_cover(df)
+        set_cover_lower_bound = 0
+        # Get set-cover lower bound from cache or compute if not present
         if cover_features is None and (self.lower_bound_strategy == 'set-cover' or self.lower_bound_strategy == 'both'):
-            cover_features, vclb = self.vertex_cover_features(node)
-            self.cache.put_vertex_cover(df, cover_features)
-        return one_offs, cover_features, vclb
+            cover_features, set_cover_lower_bound = self.set_cover_features(node)
+            self.cache.put_set_cover(df, cover_features)
+        return one_offs, cover_features, set_cover_lower_bound
         
 
     def computeUB(self, node: Node):
@@ -388,47 +407,54 @@ class Solver:
             cart = self.fast_forward(data) #Compute fast forward upper bound
             ff = cart.get_n_leaves() - 1 if cart is not None else 0
 
+            # Save upper bound
             self.cache.put_upper(data, ff)
+            # Transform the CART tree to our Node class
             best = self.transformTree(0, cart.tree_, node.parent, node.isLeft)
+            # Store the node
             self.cache.put_best(data, best)
         node.put_node_upper(self.cache.get_upper(data)) #Add the dataset upper bound to the node upper bound
         node.best = self.cache.get_best(data)
-        node.best.parent_feat = node.parent_feat
+        node.best.parent_feat = node.parent_feat # Updae the parent_feat of the best solution, since it is possible that a different one was used when splititng the parent, than for the one stored in the cache
 
     def computeLB(self, node: Node):
         data = node.df     
         if self.cache.get_lower(data) is None:
-            one_offs, cover_features, vclb = self.get_features(node)
+            one_offs, cover_features, set_cover_lower_bound = self.get_features(node) # Retrieve the one-off features, set-cover features and set-cover lowe bound
             if self.lower_bound_strategy == 'both':     
-                llb = max(len(one_offs), vclb)
+                local_lower_bound = max(len(one_offs), set_cover_lower_bound) # If both lower bound strategies are used, use the maximum
             elif self.lower_bound_strategy == 'one-off':
-                llb = len(one_offs)
+                local_lower_bound = len(one_offs)
             elif self.lower_bound_strategy == 'set-cover':
-                llb = vclb
-            self.cache.put_lower(data, llb) #Add lower bound based on vertex cover and one_offs
+                local_lower_bound = set_cover_lower_bound
+            self.cache.put_lower(data, local_lower_bound) #Add lower bound based on set cover and one_offs
         else:
-            node.dt = self.cache.get_dt(node.df)
+            node.dt = self.cache.get_dt(node.df) # Retrieve the difference table from the cache, since it was not computed because no set-cover was computed for this node (it was retrieved from the cahce). This will be needed when splitting the dt for the child node
         node.put_node_lower(self.cache.get_lower(data))
 
 
     def mark_leaf(self, node : Node):
+        # Set and store all bounds to 0
         self.cache.put_lower(node.df, 0)
         node.put_node_lower(0)
         node.put_node_upper(0)
         self.cache.put_upper(node.df, 0)
-        self.df = None
-        node.mark_ready(self.cache)
+        self.df = None # Garbage collector pls
+        node.mark_ready(self.cache) # Node is solved
 
     def solve(self, orig_df):
         df = HashableDataFrame(orig_df.copy())
         pq = queue.PriorityQueue()
-        explored = 0
+        explored = 0 # Count explored nodes
         
         root = Node(df)
         #Add the root
         pq.put(root)
+        # UB and LB for root
         self.computeLB(root)
         self.computeUB(root)
+
+        #For each node in the queue (left to be explored based on priority)
         while not pq.empty():
             node = pq.get()
             if not node.feasible: 
@@ -437,14 +463,19 @@ class Solver:
             data = node.df
             solution = self.cache.get_solution(data) #Check if solution already found
             if solution is not None:
+                # Update with bounds from the solution
                 node.lower = solution.lower
                 node.upper = solution.upper
                 node.improving = solution.improving
+
+                # Link with solution optimal feature and resulting children
                 node.link_and_prune(solution, self.cache)
+
+                # The best solution for this node is itself since now it has all the attributes of the cached solution
                 node.best = node
                 continue
         
-            explored += 1 #Only updated explored nodes if not a leaf and not in cache
+            explored += 1 #Only updated explored nodes if no solutuion already in cache
 
             need_LB = [] #Store nodes for which computing the LB might be needed
             early_solution = False
@@ -452,15 +483,22 @@ class Solver:
             #Search for all features
             pos_features = self.possible_features(data, node.parent)
 
-            one_offs, cover_features, vclb = self.get_features(node)
+            one_offs, cover_features, set_cover_lower_bound = self.get_features(node)
             for i in pos_features:
                 #Split the data based on feature i
                 left_df, right_df = self.split(data, i)
-                is_one_off_child = True if one_offs is not None and i in one_offs else False
+
+                # Store whether a one-off feature was used for splitting
+                is_one_off_child = True if one_offs is not None and i in one_offs else False 
+
+                # Count how important the feature to split is in the set-cover
                 set_cover_counts = cover_features[i] if cover_features is not None else 0
+
+                # Create children nodes
                 left = Node(left_df, i, node, True, is_one_off_child,set_cover_counts)
                 right = Node(right_df, i, node, False, is_one_off_child, set_cover_counts)
 
+                # If leaf, mark as leaf. Otherwise compute the UB (fast-forward) and store for possible later computation of LB
                 if self.check_leaf(left_df):
                     self.mark_leaf(left)
                 else:
@@ -472,19 +510,25 @@ class Solver:
                     need_LB.append(right)
                     self.computeUB(right)               
 
+                # Store a reference in the parent for all children
                 node.lefts[i] = left
                 node.rights[i] = right
 
-                if left.upper + right.upper + 1 == node.lower: #Solution found
+                if left.upper + right.upper + 1 == node.lower: #Early solution found
+                    # Update upper bound
                     node.upper = node.lower
+
+                    # Save best solution (actual solution)
                     node.save_best(i)
+
+                    # Link with the solution
                     node.link_and_prune(node.best, self.cache)
-                    node.mark_ready(self.cache)
+                    node.mark_ready(self.cache) # Node is solved
                     early_solution = True
                     break #solution found here no need to search further
             
         
-            if not early_solution:
+            if not early_solution: # If no early solution, then compute LB for all non-leaf children nodes and backpropagate
                 for child in need_LB:
                     self.computeLB(child)
                     
