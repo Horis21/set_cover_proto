@@ -11,6 +11,7 @@ class Node:
         self.improving = 20000000
         self.lower = 0
         self.dt = {}
+        self.depth = 0 if parent is None else parent.depth + 1
         self.feasible = True
         self.is_one_off_child = is_one_off_child
         self.set_cover_counts = set_cover_counts
@@ -237,17 +238,21 @@ class Node:
             raise TypeError('Can only compare two Nodes')
         if not self.feasible:
             return True
+        if self.depth < other.depth:
+            return True
+        if self.depth > other.depth:
+            return False
         if self.lower < other.lower:
             return True
         if self.lower > other.lower:
             return False
-        elif self.is_one_off_child and not other.is_one_off_child:
+        if self.is_one_off_child and not other.is_one_off_child:
             return True
-        elif other.is_one_off_child:
+        if other.is_one_off_child:
             return False
-        elif self.set_cover_counts > other.set_cover_counts:
+        if self.set_cover_counts > other.set_cover_counts:
             return True
-        elif self.set_cover_counts < other.set_cover_counts:
+        if self.set_cover_counts < other.set_cover_counts:
             return False
         if self.upper < other.upper:
             return True
@@ -258,17 +263,21 @@ class Node:
             raise TypeError('Can only compare two Nodes')
         if not self.feasible:
             return True
+        if self.depth < other.depth:
+            return True
+        if self.depth > other.depth:
+            return False
         if self.lower < other.lower:
             return True
         if self.lower > other.lower:
             return False
-        elif self.is_one_off_child and not other.is_one_off_child:
+        if self.is_one_off_child and not other.is_one_off_child:
             return True
-        elif other.is_one_off_child:
+        if other.is_one_off_child:
             return False
-        elif self.set_cover_counts > other.set_cover_counts:
+        if self.set_cover_counts > other.set_cover_counts:
             return True
-        elif self.set_cover_counts < other.set_cover_counts:
+        if self.set_cover_counts < other.set_cover_counts:
             return False
         if self.upper <= other.upper:
             return True
