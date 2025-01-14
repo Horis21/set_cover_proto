@@ -11,12 +11,13 @@ if __name__ == "__main__":
     #df = pd.read_csv("data/hepatitis.csv", sep=" ", header=None)
     #df = pd.read_csv("test.csv", sep=" ", header=None)
     solver = Solver(sample_size=5000, MIP_gap=0.2)
-    with cProfile.Profile() as profile:
-        print(solver.solve(df))
+    with keep.running():
+        with cProfile.Profile() as profile:
+            print(solver.solve(df))
 
-        results = pstats.Stats(profile)
-        results.sort_stats(pstats.SortKey.CUMULATIVE)
-        results.print_stats()
+            results = pstats.Stats(profile)
+            results.sort_stats(pstats.SortKey.CUMULATIVE)
+            results.print_stats()
     # names = ['diabetes', 'australian-credit','german-credit','hepatitis']
     # sample_sizes = [50,100,150,200]
     # gaps = [0.05,0.1,0.15,0.2,0.3]
@@ -24,6 +25,9 @@ if __name__ == "__main__":
     # strategies = ['both', 'one-off', 'set-cover']
 
     # # Initialize an empty DataFrame to store results
+    
+
+
     
     # for name in names:
     #     results = pd.DataFrame(columns=[    #     'name', 'sample_size', 'gap','nr_runs', 'strategy', 'size', 'depth', 'explored', 'elapsed_time'

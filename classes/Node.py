@@ -45,7 +45,8 @@ class Node:
         self.best = self #Sanity check to ensure solution stored in the cache have a best tree saved. Also helps garbahe collector as less distinct nodes are referenced
         
         # Store solution in cache
-        cache.put_solution(self.df, self)
+        cache_entry = cache.get_entry(self.df)
+        cache_entry.put_solution(self)
         
         
     def save_best(self, f, from_sol = None):
@@ -88,15 +89,21 @@ class Node:
         updated = False
 
         # Check if there is a better UB in the cache
-        cachedUB = cache.get_upper(self.df)
+        cache_entry = cache.get_entry(self.df)
+        cachedUB = cache_entry.get_upper()
         if cachedUB < self.upper:
             self.upper = cachedUB
-            self.best = cache.get_best(self.df) # Also get the best solution so far, since there is a better bound in the cache, it means that a better solution has been found
-        
+            self.best = cache_entry.get_best() # Also get the best solution so far, since there is a better bound in the cache, it means that a better solution has been found
+
+            updated = True
+
+        cachedLB = cache_entry.get_lower()
+        if cachedLB > self.lower:
+            self.lower = cachedLB
             updated = True
 
         # For all splitting features
-        pos_features = cache.get_possbile_feats(self.df)
+        pos_features = cache_entry.get_possbile_feats()
         for feature in pos_features:
             left = self.lefts[feature]
             right =  self.rights[feature]
@@ -107,19 +114,19 @@ class Node:
                 childrenUpper = upperBound 
                 best_feat = feature # Store the feature responsible
 
-            childrenLower = min(childrenLower,  left.lower + right.upper + 1)
+            childrenLower = min(childrenLower,  left.lower + right.lower + 1)
 
         #New best solution found
         if childrenUpper < self.upper:  # If we found a better solution
             self.save_best(best_feat) # Save best solution
             self.put_node_upper(childrenUpper) # Store the solution size
-            if cache.put_upper(self.df, childrenUpper): # Update the cache
-                cache.put_best(self.df, self.best) # Only if it's better than that we have in the cache (should always be true as no multi threading or paralization yet)
+            if cache_entry.put_upper(childrenUpper): # Update the cache
+                cache_entry.put_best(self.best) # Only if it's better than that we have in the cache (should always be true as no multi threading or paralization yet)
             updated = True
 
         # Same with the lower bound, store and update
         if childrenLower > self.lower:
-            cache.put_lower(self.df, childrenLower)
+            cache_entry.put_lower(childrenLower)
             self.put_node_lower(childrenLower)
             updated = True
 
@@ -232,9 +239,17 @@ class Node:
             return True
         if self.lower < other.lower:
             return True
-        elif self.lower == other.lower and self.is_one_off_child and not other.is_one_off_child:
+        if self.lower > other.lower:
+            return False
+        elif self.is_one_off_child and not other.is_one_off_child:
             return True
-        elif self.lower == other.lower and self.set_cover_counts > other.set_cover_counts:
+        elif other.is_one_off_child:
+            return False
+        elif self.set_cover_counts > other.set_cover_counts:
+            return True
+        elif self.set_cover_counts < other.set_cover_counts:
+            return False
+        if self.upper < other.upper:
             return True
         return False
 
@@ -245,9 +260,17 @@ class Node:
             return True
         if self.lower < other.lower:
             return True
-        elif self.lower == other.lower and self.is_one_off_child and not other.is_one_off_child:
+        if self.lower > other.lower:
+            return False
+        elif self.is_one_off_child and not other.is_one_off_child:
             return True
-        elif self.lower == other.lower and self.set_cover_counts >= other.set_cover_counts:
+        elif other.is_one_off_child:
+            return False
+        elif self.set_cover_counts > other.set_cover_counts:
+            return True
+        elif self.set_cover_counts < other.set_cover_counts:
+            return False
+        if self.upper <= other.upper:
             return True
         return False
 

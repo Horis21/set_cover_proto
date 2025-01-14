@@ -7,7 +7,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.tree import export_text
 from classes.Node import Node
 from classes.Cache import Cache
-from classes.Cache import HashableDataFrame
+from classes.HashableDataFrame import HashableDataFrame
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics import pairwise_distances
 from sklearn.metrics import pairwise_distances_argmin_min
@@ -65,7 +65,8 @@ class Solver:
             self.split_differnce_table(node.parent, node.parent_feat)
 
         # Store it in the cahce
-        self.cache.put_dt(node.df, node.dt)
+        cache_entry = self.cache.get_entry(node.df)
+        cache_entry.put_dt(node.dt)
         return self.get_dt(node)
 
 
@@ -325,7 +326,8 @@ class Solver:
         
     def possible_features(self, df, parent = None):
             # Check if already in cache
-            features = self.cache.get_possbile_feats(df)
+            cache_entry = self.cache.get_entry(df)
+            features = cache_entry.get_possbile_feats()
             if features is not None:
                 return features
         
@@ -348,7 +350,8 @@ class Solver:
 
             # Get the possible features of the present node, and compute intersection to remove features that weren't possible for the parent and therefore, won't be in the child as well. This speeds up the next part
             if parent is not None:
-                parent_possible_feats = self.cache.get_possbile_feats(parent.df)
+                parent_cache_entry = self.cache.get_entry(parent.df)
+                parent_possible_feats = parent_cache_entry.get_possbile_feats()
                 features = set(features) & set(parent_possible_feats)
 
             # Iterate collumns to remove duplicat or complementary features among columns
@@ -372,7 +375,7 @@ class Solver:
                     features.remove(i)
                     cols.remove(col) #Remove so that we don't remove the complement as well, when we get to the feature
 
-            self.cache.put_possible_feats(df, features)
+            cache_entry.put_possible_feats(features)
             return features
         
     #Return one_offs, cover_features and set cover lower bound    
@@ -380,46 +383,50 @@ class Solver:
         df = node.df
         parent = node.parent
         feature = node.parent_feat # This is the feature that the parent splits on to create this current node
-        one_offs = self.cache.get_one_offs(df)
+        cache_entry = self.cache.get_entry(node.df)
+        one_offs = cache_entry.get_one_offs()
         if one_offs is None and (self.lower_bound_strategy == 'one-off' or self.lower_bound_strategy == 'both'):
             if parent is None:
                 # Compute one-off features from scratch for the root node
                 one_offs = self.one_off_features(df)
-                self.cache.put_one_offs(df, one_offs)
+                cache_entry.put_one_offs(one_offs)
             else:
                 # Otherwise simply remove the parent_feat from the list, since it was used to split 
-                one_offs = self.cache.get_one_offs(parent.df)
+                parent_cache_entry = self.cache.get_entry(parent.df)
+                one_offs = parent_cache_entry.get_one_offs()
                 if feature in one_offs:
                     one_offs.remove(feature)
-                self.cache.put_one_offs(df, one_offs)
-        cover_features = self.cache.get_set_cover(df)
+                cache_entry.put_one_offs(one_offs)
+        cover_features =  cache_entry.get_set_cover()
         set_cover_lower_bound = 0
         # Get set-cover lower bound from cache or compute if not present
         if cover_features is None and (self.lower_bound_strategy == 'set-cover' or self.lower_bound_strategy == 'both'):
             cover_features, set_cover_lower_bound = self.set_cover_features(node)
-            self.cache.put_set_cover(df, cover_features)
+            cache_entry.put_set_cover(cover_features)
         return one_offs, cover_features, set_cover_lower_bound
         
 
     def computeUB(self, node: Node):
         data = node.df
-        if self.cache.get_upper(data) is None:
+        cache_entry = self.cache.get_entry(node.df)
+        if cache_entry.get_upper() is None:
             cart = self.fast_forward(data) #Compute fast forward upper bound
             ff = cart.get_n_leaves() - 1 if cart is not None else 0
 
             # Save upper bound
-            self.cache.put_upper(data, ff)
+            cache_entry.put_upper(ff)
             # Transform the CART tree to our Node class
             best = self.transformTree(0, cart.tree_, node.parent, node.isLeft)
             # Store the node
-            self.cache.put_best(data, best)
-        node.put_node_upper(self.cache.get_upper(data)) #Add the dataset upper bound to the node upper bound
-        node.best = self.cache.get_best(data)
+            cache_entry.put_best(best)
+        node.put_node_upper(cache_entry.get_upper()) #Add the dataset upper bound to the node upper bound
+        node.best = cache_entry.get_best()
         node.best.parent_feat = node.parent_feat # Updae the parent_feat of the best solution, since it is possible that a different one was used when splititng the parent, than for the one stored in the cache
 
     def computeLB(self, node: Node):
-        data = node.df     
-        if self.cache.get_lower(data) is None:
+        data = node.df
+        cache_entry = self.cache.get_entry(node.df)     
+        if cache_entry.get_lower() is None:
             one_offs, cover_features, set_cover_lower_bound = self.get_features(node) # Retrieve the one-off features, set-cover features and set-cover lowe bound
             if self.lower_bound_strategy == 'both':     
                 local_lower_bound = max(len(one_offs), set_cover_lower_bound) # If both lower bound strategies are used, use the maximum
@@ -427,19 +434,20 @@ class Solver:
                 local_lower_bound = len(one_offs)
             elif self.lower_bound_strategy == 'set-cover':
                 local_lower_bound = set_cover_lower_bound
-            self.cache.put_lower(data, local_lower_bound) #Add lower bound based on set cover and one_offs
-        else:
-            node.dt = self.cache.get_dt(node.df) # Retrieve the difference table from the cache, since it was not computed because no set-cover was computed for this node (it was retrieved from the cahce). This will be needed when splitting the dt for the child node
-        node.put_node_lower(self.cache.get_lower(data))
+            cache_entry.put_lower(local_lower_bound) #Add lower bound based on set cover and one_offs
+        elif self.lower_bound_strategy != 'one-off':
+            node.dt = cache_entry.get_dt() # Retrieve the difference table from the cache, since it was not computed because no set-cover was computed for this node (it was retrieved from the cahce). This will be needed when splitting the dt for the child node
+        node.put_node_lower(cache_entry.get_lower())
 
 
     def mark_leaf(self, node : Node):
         # Set and store all bounds to 0
-        self.cache.put_lower(node.df, 0)
+        cache_entry = self.cache.get_entry(node.df)
+        cache_entry.put_lower(0)
         node.put_node_lower(0)
         node.put_node_upper(0)
-        self.cache.put_upper(node.df, 0)
-        self.df = None # Garbage collector pls
+        cache_entry.put_upper(0)
+        node.df = None # Garbage collector pls
         node.mark_ready(self.cache) # Node is solved
 
     def solve(self, orig_df):
@@ -461,7 +469,8 @@ class Solver:
                 continue #Skip nodes deemed unfeasible
 
             data = node.df
-            solution = self.cache.get_solution(data) #Check if solution already found
+            cache_entry = self.cache.get_entry(node.df)
+            solution = cache_entry.get_solution() #Check if solution already found
             if solution is not None:
                 # Update with bounds from the solution
                 node.lower = solution.lower
