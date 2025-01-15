@@ -15,7 +15,7 @@ import gc
 import sys
 
 class Solver:
-    def __init__(self, sample_size = 15000, MIP_gap = 0.05, cover_runs = 1, lower_bound_strategy = 'both'):
+    def __init__(self, sample_size = 1000, MIP_gap = 0.05, cover_runs = 1, lower_bound_strategy = 'both'):
         self.sample_size = sample_size
         self.MIP_gap = MIP_gap
         self.cover_runs = cover_runs
@@ -24,6 +24,10 @@ class Solver:
 
     def split_differnce_table(self, node : Node, feat):
         parent_dt = node.dt
+
+        if not parent_dt:
+            self.split_differnce_table(node.parent, node.parent_feat) # If somehow lost cached dt recompute it
+            parent_dt = node.dt
 
         # Initialize empty dictionaries
         left_dt = {}
@@ -146,14 +150,12 @@ class Solver:
     def get_sample(self, df):
         if df.size == 0:
             print("get sample df  is empty")
-        labels = np.unique(df[0].values)
-        cluster_size = int(np.floor(self.sample_size / len(labels))) # Generate balanced clusters
 
-        sample = pd.DataFrame()
-        for label in labels: # For each class compute a cluster
-            class_points = df[df[0] == label] # Get all points from the class
-            clustered_points = self.apply_clustering(class_points, cluster_size) # Apply clustering algo
-            sample = pd.concat([sample, clustered_points]) # Add them to the sample
+       
+        if df.shape[0] <= self.sample_size:
+            return df
+        
+        sample = self.apply_clustering(df) # Apply clustering algo
 
         if sample.size == 0:
             print("final sample is empty")
@@ -164,13 +166,10 @@ class Solver:
         # Random sample alternative
         return df if df.shape[0] <= self.sample_size else df.sample(self.sample_size)
 
-    def apply_clustering(self, df, cluster_size):
+    def apply_clustering(self, df):
         if df.size == 0:
             print("applying clustering on empty sample")
 
-        # If not enough points from this class, then just return all of them
-        if df.shape[0] <= cluster_size:
-            return df
         
         # Initialize an empty list to hold the representative samples
         representative_samples = []
@@ -179,9 +178,9 @@ class Solver:
         # Apply Agglomerative Clustering with Hamming distance
 
         # DelftBlue syntax
-        #clustering = AgglomerativeClustering(n_clusters=cluster_size, affinity='precomputed', linkage = 'average') 
+        #clustering = AgglomerativeClustering(n_clusters=self.sample_size, affinity='precomputed', linkage = 'average') 
         # Otherwise
-        clustering = AgglomerativeClustering(n_clusters=cluster_size, metric='precomputed', linkage = 'average')
+        clustering = AgglomerativeClustering(n_clusters=self.sample_size, metric='precomputed', linkage = 'average')
         
         # Compute the pairwise Hamming distance matrix
         hamming_distances = pairwise_distances(df, metric='hamming')
@@ -192,7 +191,7 @@ class Solver:
         cluster_labels = clustering.fit_predict(hamming_distances)
         data['cluster'] = cluster_labels
 
-        for cluster_id in range(cluster_size):
+        for cluster_id in range(self.sample_size):
             # Get all points in the current cluster
             cluster_points = data[data['cluster'] == cluster_id].drop(columns=['cluster'])
 
@@ -219,7 +218,7 @@ class Solver:
             # Get a random sample from the rows of the difference table (This could be improved by using clustering)
             #sample = self.get_sample(df)
             diff_table = self.get_difference_table(node)
-            sample = self.get_random_sample(diff_table)
+            sample = self.get_sample(diff_table)
             features = self.find_set_cover(sample, verbose=False)
 
             # the lower bound is the maximum of all the lower bounds we have obtained
@@ -243,8 +242,9 @@ class Solver:
         
 
         
-    def one_off_features(self, df):
-        pos_features = self.possible_features(df)
+    def one_off_features(self, node : Node):
+        df = node.df
+        pos_features = node.possible_features(self.cache)
 
         # Split positive and negative instances (column 0 is the label)
         pos = set(tuple(x) for x in df[df[0] == 1].values)
@@ -323,60 +323,7 @@ class Solver:
             cart = DecisionTreeClassifier()
             cart.fit(X, df[0])
             return cart
-        
-    def possible_features(self, df, parent = None):
-            # Check if already in cache
-            cache_entry = self.cache.get_entry(df)
-            features = cache_entry.get_possbile_feats()
-            if features is not None:
-                return features
-        
-            # Initialize with all features in the dataset
-            features = set([i for i in range(df.shape[1]-1)])
-            features_present = np.zeros(df.shape[1]-1)
-            features_always_present = np.ones(df.shape[1]-1)
-
-            for i, row in df.iterrows():
-                features_present = np.logical_or(features_present, row[1:]) # Mark features that are present at least once in the dataset (OR)
-                features_always_present = np.logical_and(features_always_present, row[1:]) # Mark features that are always present in the dataset (AND)
-
-            for i, f in enumerate(features_present):
-                if not f: 
-                    features.remove(i) #Remove all features that aren't present in any instance
-
-            for i, f in enumerate(features_always_present):
-                if f: 
-                    features.remove(i) #Remove all features that are present in all instances
-
-            # Get the possible features of the present node, and compute intersection to remove features that weren't possible for the parent and therefore, won't be in the child as well. This speeds up the next part
-            if parent is not None:
-                parent_cache_entry = self.cache.get_entry(parent.df)
-                parent_possible_feats = parent_cache_entry.get_possbile_feats()
-                features = set(features) & set(parent_possible_feats)
-
-            # Iterate collumns to remove duplicat or complementary features among columns
-            cols = set()
-            for i, col in enumerate(df.columns[1:]):
-                if i not in features:
-                    continue #Don't bother with already ignored features
-
-                if col in cols:
-                    features.remove(i) #Redundant feature, since the column is already present in the set
-                else:
-                    cols.add(col)
-            
-            for i, col in enumerate(df.columns[1:]):
-                if i not in features:
-                    continue #Don't bother with already ignored features
-
-                #Check if its complement feature is present
-                complement = np.logical_xor(col,col)
-                if complement in cols: #Check if the complement of this feature exists
-                    features.remove(i)
-                    cols.remove(col) #Remove so that we don't remove the complement as well, when we get to the feature
-
-            cache_entry.put_possible_feats(features)
-            return features
+    
         
     #Return one_offs, cover_features and set cover lower bound    
     def get_features(self, node : Node):
@@ -384,19 +331,17 @@ class Solver:
         parent = node.parent
         feature = node.parent_feat # This is the feature that the parent splits on to create this current node
         cache_entry = self.cache.get_entry(node.df)
-        one_offs = cache_entry.get_one_offs()
-        if one_offs is None and (self.lower_bound_strategy == 'one-off' or self.lower_bound_strategy == 'both'):
+        if self.lower_bound_strategy == 'one-off' or self.lower_bound_strategy == 'both':
             if parent is None:
                 # Compute one-off features from scratch for the root node
-                one_offs = self.one_off_features(df)
-                cache_entry.put_one_offs(one_offs)
+                one_offs = self.one_off_features(node)
+                node.one_offs = one_offs
             else:
                 # Otherwise simply remove the parent_feat from the list, since it was used to split 
-                parent_cache_entry = self.cache.get_entry(parent.df)
-                one_offs = parent_cache_entry.get_one_offs()
+                one_offs = parent.one_offs
                 if feature in one_offs:
                     one_offs.remove(feature)
-                cache_entry.put_one_offs(one_offs)
+                node.one_offs = one_offs
         cover_features =  cache_entry.get_set_cover()
         set_cover_lower_bound = 0
         # Get set-cover lower bound from cache or compute if not present
@@ -436,7 +381,7 @@ class Solver:
                 local_lower_bound = set_cover_lower_bound
             cache_entry.put_lower(local_lower_bound) #Add lower bound based on set cover and one_offs
         elif self.lower_bound_strategy != 'one-off':
-            node.dt = cache_entry.get_dt() # Retrieve the difference table from the cache, since it was not computed because no set-cover was computed for this node (it was retrieved from the cahce). This will be needed when splitting the dt for the child node
+            node.dt = cache_entry.get_dt() # Retrieve the difference table from the cache, since it was not computed because no set-cover was computed for this node (it was retrieved from the cache). This will be needed when splitting the dt for the child node
         node.put_node_lower(cache_entry.get_lower())
 
 
@@ -490,7 +435,7 @@ class Solver:
             early_solution = False
 
             #Search for all features
-            pos_features = self.possible_features(data, node.parent)
+            pos_features = node.possible_features(self.cache)
 
             one_offs, cover_features, set_cover_lower_bound = self.get_features(node)
             for i in pos_features:

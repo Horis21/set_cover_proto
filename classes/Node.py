@@ -1,4 +1,6 @@
 import queue
+
+import numpy as np
 from classes.Cache import Cache
 
 class Node:
@@ -9,6 +11,7 @@ class Node:
         self.f = None
         self.upper = 20000000
         self.improving = 20000000
+        self.one_offs = None
         self.lower = 0
         self.dt = {}
         self.depth = 0 if parent is None else parent.depth + 1
@@ -37,7 +40,63 @@ class Node:
         # Backpropagate the now solved now
         if self.parent is not None:
             self.parent.backpropagate(cache)
-        self.cut_branches() # Found solution no need to search anymore in this subtree         
+        self.cut_branches() # Found solution no need to search anymore in this subtree     
+
+    def possible_features(self, cache : Cache):
+            # Check if already in cache
+            df = self.df
+            parent = self.parent
+            cache_entry = cache.get_entry(df)
+            features = cache_entry.get_possbile_feats()
+            if features is not None:
+                return features
+        
+            # Initialize with all features in the dataset
+            features = set([i for i in range(df.shape[1]-1)])
+            features_present = np.zeros(df.shape[1]-1)
+            features_always_present = np.ones(df.shape[1]-1)
+
+            for i, row in df.iterrows():
+                features_present = np.logical_or(features_present, row[1:]) # Mark features that are present at least once in the dataset (OR)
+                features_always_present = np.logical_and(features_always_present, row[1:]) # Mark features that are always present in the dataset (AND)
+
+            for i, f in enumerate(features_present):
+                if not f: 
+                    features.remove(i) #Remove all features that aren't present in any instance
+
+            for i, f in enumerate(features_always_present):
+                if f: 
+                    features.remove(i) #Remove all features that are present in all instances
+
+            # Get the possible features of the present node, and compute intersection to remove features that weren't possible for the parent and therefore, won't be in the child as well. This speeds up the next part
+            if parent is not None:
+                parent_cache_entry = cache.get_entry(parent.df)
+                parent_possible_feats = parent_cache_entry.get_possbile_feats()
+                features = set(features) & set(parent_possible_feats) if parent_possible_feats is not None else set(features)
+
+            # Iterate collumns to remove duplicat or complementary features among columns
+            cols = set()
+            for i, col in enumerate(df.columns[1:]):
+                if i not in features:
+                    continue #Don't bother with already ignored features
+
+                if col in cols:
+                    features.remove(i) #Redundant feature, since the column is already present in the set
+                else:
+                    cols.add(col)
+            
+            for i, col in enumerate(df.columns[1:]):
+                if i not in features:
+                    continue #Don't bother with already ignored features
+
+                #Check if its complement feature is present
+                complement = np.logical_xor(col,col)
+                if complement in cols: #Check if the complement of this feature exists
+                    features.remove(i)
+                    cols.remove(col) #Remove so that we don't remove the complement as well, when we get to the feature
+
+            cache_entry.put_possible_feats(features)
+            return features
         
     #Mark subproblem solved
     def mark_ready(self, cache : Cache): 
@@ -92,19 +151,19 @@ class Node:
         # Check if there is a better UB in the cache
         cache_entry = cache.get_entry(self.df)
         cachedUB = cache_entry.get_upper()
-        if cachedUB < self.upper:
+        if cachedUB is not None and cachedUB < self.upper:
             self.upper = cachedUB
             self.best = cache_entry.get_best() # Also get the best solution so far, since there is a better bound in the cache, it means that a better solution has been found
 
             updated = True
 
         cachedLB = cache_entry.get_lower()
-        if cachedLB > self.lower:
+        if cachedLB is not None and cachedLB > self.lower:
             self.lower = cachedLB
             updated = True
 
         # For all splitting features
-        pos_features = cache_entry.get_possbile_feats()
+        pos_features = self.possible_features(cache)
         for feature in pos_features:
             left = self.lefts[feature]
             right =  self.rights[feature]
@@ -128,6 +187,7 @@ class Node:
         # Same with the lower bound, store and update
         if childrenLower > self.lower:
             cache_entry.put_lower(childrenLower)
+            cache_entry.put_dt(self.dt) # refresh dt in the cache hopefully it stays there
             self.put_node_lower(childrenLower)
             updated = True
 
