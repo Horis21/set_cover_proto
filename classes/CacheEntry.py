@@ -3,6 +3,7 @@ class CacheEntry:
         self.upper = None
         self.lower = None
         self.solution = None
+        self.one_off = None
         self.set_cover = None
         self.possible_feats = None
         self.best = None
@@ -16,6 +17,9 @@ class CacheEntry:
 
     def get_possbile_feats(self):
         return self.possible_feats
+
+    def get_one_offs(self):
+        return self.one_off
 
     def get_set_cover(self):
         return self.set_cover
@@ -44,6 +48,9 @@ class CacheEntry:
 
     def put_solution(self, solution):
         self.solution = solution
+
+    def put_one_offs(self, one_offs):
+        self.one_off = one_offs
 
     def put_possible_feats(self, feats):
         self.possible_feats = feats
