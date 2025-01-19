@@ -1,15 +1,16 @@
 #!/bin/bash
 
 #SBATCH --job-name="bobotree"
-#SBATCH --time=02:10:00
-#SBATCH --ntasks=16
-#SBATCH --cpus-per-task=32
+#SBATCH --time=24:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
 #SBATCH --partition=compute
-#SBATCH --mem-per-cpu=2GB
+#SBATCH --mem-per-cpu=32GB
 #SBATCH --account=education-eemcs-bsc-ti
 
 module load 2023r1
 module load openmpi
+module load py-scikit-learn
 module load python
 module load py-numpy
 module load py-pandas
@@ -31,7 +32,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Run the Python script
-srun python vertex_cover.py > output.log 2>&1
+srun python set-cover.py > output.log 2>&1
 
 # Check if python script was successful
 if [ $? -ne 0 ]; then

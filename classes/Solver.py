@@ -244,11 +244,24 @@ class Solver:
         
     def one_off_features(self, node : Node):
         df = node.df
+        print(df)
         pos_features = node.possible_features(self.cache)
 
         # Split positive and negative instances (column 0 is the label)
-        pos = set(tuple(x) for x in df[df[0] == 1].values)
-        neg = set(tuple(x) for x in df[df[0] == 0].values)
+        pos = set(
+                    tuple(
+                        x[i + 1] if i in pos_features else 0  # Adjust for column 1 = feature 0
+                        for i in range(len(x) - 1)            # Skip the label column
+                    )
+                    for x in df[df[0] == 1].values            # Select positive instances
+                )
+        neg = set(
+                    tuple(
+                        x[i + 1] if i in pos_features else 0
+                        for i in range(len(x) - 1)
+                    )
+                    for x in df[df[0] == 0].values            # Select negative instances
+                )
 
         features = set() # Initialize one-off features foubd as a set
 
@@ -265,12 +278,12 @@ class Solver:
                 if f in features: #If we already found a one-off based on this feature continue
                     continue
                 new_row = np.copy(row)
-                new_row[f+1] = np.logical_xor(1, new_row[f+1]) #Compute the off-by-one feature vector
-                new_row[0] = np.logical_xor(1, new_row[0])
+                new_row[f] = np.logical_xor(1, new_row[f]) #Compute the off-by-one feature vector
                 new_row = tuple(new_row)
                 #Check in the opposing class if it exists and add to the found features
                 if opp.__contains__(new_row):
                     features.add(f)
+        print(features)
         return list(features)
 
     #Split data based on feature f
