@@ -1,12 +1,11 @@
 import pandas as pd
 import numpy as np
 import gurobipy as grb
-import queue
 from gurobipy import GRB, quicksum
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.tree import export_text
-from classes.Node import Node
 from classes.Cache import Cache
+from classes.Node import Node
 from classes.HashableDataFrame import HashableDataFrame
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics import pairwise_distances
@@ -21,6 +20,7 @@ class Solver:
         self.cover_runs = cover_runs
         self.lower_bound_strategy = lower_bound_strategy
         self.cache = Cache()
+        self.explored = 0
 
     def split_differnce_table(self, node : Node, feat):
         parent_dt = node.dt
@@ -282,7 +282,6 @@ class Solver:
                 #Check in the opposing class if it exists and add to the found features
                 if opp.__contains__(new_row):
                     features.add(f)
-        print(features)
         return list(features)
 
     #Split data based on feature f
@@ -462,101 +461,125 @@ class Solver:
         node.df = None # Garbage collector pls
         node.mark_ready(self.cache) # Node is solved
 
-    def solve(self, orig_df):
-        df = HashableDataFrame(orig_df.copy())
-        pq = queue.PriorityQueue()
-        explored = 0 # Count explored nodes
+    def find_next(self, node : Node):
+        if node.pq.empty():
+            return None
+        next = node.peek_pq()
+        while not next.feasible:
+            node.get_pq() # Pop the PQ
+            if node.pq.empty():
+                return None
+            next = node.peek_pq()
         
+        if not next.expanded:
+            return next
+        
+        next = self.find_next(next)
+        if next is not None:
+            return next
+        
+        node.get_pq() # Pop PQ since no feasible child node found within the PQ search node again 
+        return self.find_next(node)
+
+    def solve(self, orig_df):
+        df = HashableDataFrame(orig_df.copy())    
         root = Node(df)
-        #Add the root
-        pq.put(root)
+
         # UB and LB for root
         self.computeLB(root)
         self.computeUB(root)
 
-        #For each node in the queue (left to be explored based on priority)
-        while not pq.empty():
-            node = pq.get()
-            if not node.feasible: 
-                continue #Skip nodes deemed unfeasible
+        # Expand root node
+        self.expand_node(root)
 
-            data = node.df
-            cache_entry = self.cache.get_entry(node.df)
-            solution = cache_entry.get_solution() #Check if solution already found
-            if solution is not None:
-                # Update with bounds from the solution
-                node.lower = solution.lower
-                node.upper = solution.upper
-                node.improving = solution.improving
-
-                # Link with solution optimal feature and resulting children
-                node.link_and_prune(solution, self.cache)
-
-                # The best solution for this node is itself since now it has all the attributes of the cached solution
-                node.best = node
-                continue
-        
-            explored += 1 #Only updated explored nodes if no solutuion already in cache
-
-            need_LB = [] #Store nodes for which computing the LB might be needed
-            early_solution = False
-
-            #Search for all features
-            pos_features = self.possible_features(data, node.parent)
-
-            one_offs, cover_features, set_cover_lower_bound = self.get_features(node)
-            for i in pos_features:
-                #Split the data based on feature i
-                left_df, right_df = self.split(data, i)
-
-                # Store whether a one-off feature was used for splitting
-                is_one_off_child = True if one_offs is not None and i in one_offs else False 
-
-                # Count how important the feature to split is in the set-cover
-                set_cover_counts = cover_features[i] if cover_features is not None else 0
-
-                # Create children nodes
-                left = Node(left_df, i, node, True, is_one_off_child,set_cover_counts)
-                right = Node(right_df, i, node, False, is_one_off_child, set_cover_counts)
-
-                # If leaf, mark as leaf. Otherwise compute the UB (fast-forward) and store for possible later computation of LB
-                if self.check_leaf(left_df):
-                    self.mark_leaf(left)
-                else:
-                    need_LB.append(left)
-                    self.computeUB(left)
-                if self.check_leaf(right_df):
-                    self.mark_leaf(right)
-                else:
-                    need_LB.append(right)
-                    self.computeUB(right)               
-
-                # Store a reference in the parent for all children
-                node.lefts[i] = left
-                node.rights[i] = right
-
-                if left.upper + right.upper + 1 == node.lower: #Early solution found
-                    # Update upper bound
-                    node.upper = node.lower
-
-                    # Save best solution (actual solution)
-                    node.save_best(i)
-
-                    # Link with the solution
-                    node.link_and_prune(node.best, self.cache)
-                    node.mark_ready(self.cache) # Node is solved
-                    early_solution = True
-                    break #solution found here no need to search further
+        while not root.pq.empty():
+            node = self.find_next(root)
+            if node is None:
+                break
             
-        
-            if not early_solution: # If no early solution, then compute LB for all non-leaf children nodes and backpropagate
-                for child in need_LB:
-                    self.computeLB(child)
-                    
-                    pq.put(child)
-
-                node.backpropagate(self.cache)
-
+            self.expand_node(node)
 
         size, depth = root.print_solution()
-        return size, depth, explored
+        return size, depth, self.explored
+
+    def expand_node(self, node : Node):
+        node.expanded = True
+        data = node.df
+        cache_entry = self.cache.get_entry(node.df)
+        solution = cache_entry.get_solution() #Check if solution already found
+        if solution is not None:
+            # Update with bounds from the solution
+            node.lower = solution.lower
+            node.upper = solution.upper
+            node.improving = solution.improving
+
+            # Link with solution optimal feature and resulting children
+            node.link_and_prune(solution, self.cache)
+
+            # The best solution for this node is itself since now it has all the attributes of the cached solution
+            node.best = node
+            return
+    
+        self.explored += 1  #Only updated explored nodes if no solutuion already in cache
+
+        need_LB = [] #Store nodes for which computing the LB might be needed
+        early_solution = False
+
+        #Search for all features
+        pos_features = self.possible_features(data, node.parent)
+
+        one_offs, cover_features, set_cover_lower_bound = self.get_features(node)
+        for i in pos_features:
+            #Split the data based on feature i
+            left_df, right_df = self.split(data, i)
+
+            # Store whether a one-off feature was used for splitting
+            is_one_off_child = True if one_offs is not None and i in one_offs else False 
+
+            # Count how important the feature to split is in the set-cover
+            set_cover_counts = cover_features[i] if cover_features is not None else 0
+
+            # Create children nodes
+            left = Node(left_df, i, node, True, is_one_off_child,set_cover_counts)
+            right = Node(right_df, i, node, False, is_one_off_child, set_cover_counts)
+
+            # If leaf, mark as leaf. Otherwise compute the UB (fast-forward) and store for possible later computation of LB
+            if self.check_leaf(left_df):
+                self.mark_leaf(left)
+            else:
+                need_LB.append(left)
+                self.computeUB(left)
+            if self.check_leaf(right_df):
+                self.mark_leaf(right)
+            else:
+                need_LB.append(right)
+                self.computeUB(right)               
+
+            # Store a reference in the parent for all children
+            node.lefts[i] = left
+            node.rights[i] = right
+
+            if left.upper + right.upper + 1 == node.lower: #Early solution found
+                # Update upper bound
+                node.upper = node.lower
+
+                # Save best solution (actual solution)
+                node.save_best(i)
+
+                # Link with the solution
+                node.link_and_prune(node.best, self.cache)
+                node.mark_ready(self.cache) # Node is solved
+                early_solution = True
+                break #solution found here no need to search further
+        
+    
+        if not early_solution: # If no early solution, then compute LB for all non-leaf children nodes and backpropagate
+            for child in need_LB:
+                self.computeLB(child)
+                
+                node.add_to_queue(child)
+
+            node.backpropagate(self.cache)
+
+
+       

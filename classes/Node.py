@@ -1,4 +1,5 @@
 import queue
+from classes.CustomPQ import CustomPQ
 from classes.Cache import Cache
 
 class Node:
@@ -21,6 +22,17 @@ class Node:
         self.left = None
         self.right = None
         self.parent = parent
+        self.expanded = False
+        self.pq = CustomPQ() # Local priority queue for hierarchical management
+
+    def add_to_queue(self, child):
+        self.pq.put(child)
+
+    def peek_pq(self):
+        return self.pq.peek()
+    
+    def get_pq(self):
+        return self.pq.get()
 
     def backpropagate(self, cache : Cache):
         parent = self.parent
