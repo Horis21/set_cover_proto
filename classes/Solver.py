@@ -285,8 +285,23 @@ class Solver:
         return list(features)
 
     #Split data based on feature f
-    def split(self, df, f):
-        return HashableDataFrame(df[df[f+1] == 0]), HashableDataFrame(df[df[f+1]==1])
+    def split(self, hashable_df : HashableDataFrame, f):
+        """
+        Splits the dataset based on the given feature.
+
+        Args:
+            hashable_df (HashableDataFrame): The dataset to split.
+            feature (int): The feature index for splitting.
+
+        Returns:
+            Tuple[HashableDataFrame, HashableDataFrame]: Left and right subsets.
+        """
+        df = hashable_df.get_df()
+        indices = hashable_df.get_indices()
+        condition = df.loc[indices, f + 1] == 0  # Adjust for feature index
+        left = hashable_df.subset(condition)
+        right = hashable_df.subset(~condition)
+        return left, right
 
     #Check if the dataset is pure
     def check_leaf(self, df):
@@ -482,7 +497,7 @@ class Solver:
         return self.find_next(node)
 
     def solve(self, orig_df):
-        df = HashableDataFrame(orig_df.copy())    
+        df = HashableDataFrame(orig_df)    
         root = Node(df)
 
         # UB and LB for root

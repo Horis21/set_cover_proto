@@ -7,8 +7,8 @@ from wakepy import keep
 
 if __name__ == "__main__":
     #df = pd.read_csv("data/diabetes.csv", sep=" ", header=None)
-    df = pd.read_csv("data/monk3_bin.csv", sep=" ", header=None)
-    #df = pd.read_csv("data/hepatitis.csv", sep=" ", header=None)
+    #df = pd.read_csv("data/monk3_bin.csv", sep=" ", header=None)
+    df = pd.read_csv("data/hepatitis.csv", sep=" ", header=None)
     #df = pd.read_csv("test.csv", sep=" ", header=None)
     solver = Solver(sample_size=5000, MIP_gap=0.2)
     with keep.running():
@@ -17,7 +17,7 @@ if __name__ == "__main__":
 
             results = pstats.Stats(profile)
             results.sort_stats(pstats.SortKey.CUMULATIVE)
-            #results.print_stats()
+            results.print_stats()
     # names = ['diabetes', 'australian-credit','german-credit','hepatitis']
     # sample_sizes = [50,100,150,200]
     # gaps = [0.05,0.1,0.15,0.2,0.3]
