@@ -479,36 +479,29 @@ class Solver:
     def find_next(self, node : Node):
         while not node.pq.empty():
             next = node.get_pq()
-            print(f"node = {next} with lb = {next.lower}")
             if not next.feasible:
-                print("infeasible")
                 continue # Skip infeasible nodes and pop from PQ 
 
             if not next.expanded:
-                print("good not expanded")
-                return next # Feasible and not expanded node good return
+                return next # Feasible and not expanded node is good!
             
-            print("must recursse")
             next_child = self.find_next(next) # Recursive call on expanded, but still feasibile node to find best children node to expand
             if next_child is not None:
-                return next_child # Return the found node, since it's good
+                return next_child # Return the found node, since it's good (only other return checks for not expanded)
             
-            print("nothing found next")
             # Else go to next node, don't care about next to add back to PQ since no feasibile children nodes
         
-        print("next is none")
         return None # If no feasible next node found
     
     def add_back_to_pq(self, node : Node):
         parent = node.parent
         if parent is None:
-            print("aici")
-        print(f"adding node = {node} back to pq with parent = {parent}")
-        print(f"feasible = {node.feasible}")
-        if parent is None:
             return # No need to add these nodes back
         
         parent.add_to_queue(node) # Add back to parent's PQ
+
+        if not node.feasible:
+            node.parent = None # Clean references for gc maybe only if node is infeasible anyway
 
         self.add_back_to_pq(parent) # Recursive call for parent since it was popped as well
 
@@ -524,13 +517,10 @@ class Solver:
         self.expand_node(root)
 
         while not root.pq.empty():
-            print("finding next")
             node = self.find_next(root)
             if node is None:
                 break # No nodes left to search \ expand
             
-            print("next node to explore: ", node)
-            print("lb of :", node.lower )
             self.expand_node(node)
 
             self.add_back_to_pq(node) # Add back to PQ to reupdate order
@@ -544,11 +534,10 @@ class Solver:
         cache_entry = self.cache.get_entry(node.df)
         solution = cache_entry.get_solution() #Check if solution already found
         if solution is not None:
-            print("Found solution in cache")
             # Update with bounds from the solution
             node.lower = solution.lower
             node.upper = solution.upper
-            print(f"sol lower = {solution.lower} and upper = {solution.upper}")
+
             node.improving = solution.improving
 
             # Link with solution optimal feature and resulting children
@@ -598,7 +587,6 @@ class Solver:
             node.rights[i] = right
 
             if left.upper + right.upper + 1 == node.lower: #Early solution found
-                print(f"Early solution found with count = {node.lower}")
                 # Update upper bound
                 node.upper = node.lower
 

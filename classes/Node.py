@@ -41,7 +41,6 @@ class Node:
 
 
     def link_and_prune(self, solution, cache : Cache):
-        print(f"link and prune for {self}")
         # Save the optimal feature left and right children that occur after splitting on it
         self.f = solution.f
         self.left = solution.left
@@ -157,9 +156,6 @@ class Node:
         if self.parent is None:
             print(f"Updated local bounds for root lower = {self.lower}, upper = {self.upper}")
 
-        print(f"Updated local bounds for node: {self}")
-        print(f"lower = {self.lower}, upper = {self.upper}")
-
         #Cannot improve anymore if ..
         if self.lower == self.upper or self.lower > self.improving:
             if self.parent is None:
@@ -202,9 +198,9 @@ class Node:
         self.best = self # We still need to save the best solution, since we will be cutting the branches off of solved subtrees as well. 
         # Prune all children as well
         for left in self.lefts.values():
-            left.cut_branches() 
+            left.cut_branches() if self.f is not None and left.parent_feat == self.f else left.cut_branches_infeasible() 
         for right in self.rights.values():
-            right.cut_branches()
+            right.cut_branches() if self.f is not None and right.parent_feat == self.f else right.cut_branches_infeasible() 
 
         # Remove references to children
         self.lefts = {}
