@@ -8,8 +8,8 @@ class Node:
         self.parent_feat = parent_feat
         self.isLeft = isLeft
         self.f = None
-        self.upper = 20000000
-        self.improving = 20000000
+        self.upper = 200000
+        self.improving = 200000
         self.lower = 0
         self.dt = {}
         self.depth = 0 if parent is None else parent.depth + 1
@@ -23,7 +23,7 @@ class Node:
         self.right = None
         self.parent = parent
         self.expanded = False
-        self.pq = CustomPQ() # Local priority queue for hierarchical management
+        self.pq = queue.PriorityQueue() # Local priority queue for hierarchical management
 
     def add_to_queue(self, child):
         self.pq.put(child)
@@ -41,6 +41,7 @@ class Node:
 
 
     def link_and_prune(self, solution, cache : Cache):
+        print(f"link and prune for {self}")
         # Save the optimal feature left and right children that occur after splitting on it
         self.f = solution.f
         self.left = solution.left
@@ -53,9 +54,8 @@ class Node:
         
     #Mark subproblem solved
     def mark_ready(self, cache : Cache): 
-
-        self.parent = None # Remove reference to parent so garbage collector can pick the node up if it become infeasible later on (possiblt not needed)       
-        self.best = self #Sanity check to ensure solution stored in the cache have a best tree saved. Also helps garbahe collector as less distinct nodes are referenced
+  
+        self.best = self #Sanity check to ensure solution stored in the cache have a best tree saved. Also helps garbage collector as less distinct nodes are referenced
         
         # Store solution in cache
         cache_entry = cache.get_entry(self.df)
@@ -121,13 +121,16 @@ class Node:
             left = self.lefts[feature]
             right =  self.rights[feature]
 
+           
             upperBound = left.upper + right.upper + 1 # classic UB
+            
 
             if upperBound < childrenUpper: # If this is the best solution found so far
                 childrenUpper = upperBound 
                 best_feat = feature # Store the feature responsible
 
             childrenLower = min(childrenLower,  left.lower + right.lower + 1)
+            
 
         #New best solution found
         if childrenUpper < self.upper:  # If we found a better solution
@@ -149,9 +152,13 @@ class Node:
         if not updated: # If no bounds were updated stop backpropagation
             return False
 
+
         # Print when root bounds get updated
         if self.parent is None:
             print(f"Updated local bounds for root lower = {self.lower}, upper = {self.upper}")
+
+        print(f"Updated local bounds for node: {self}")
+        print(f"lower = {self.lower}, upper = {self.upper}")
 
         #Cannot improve anymore if ..
         if self.lower == self.upper or self.lower > self.improving:
@@ -168,18 +175,31 @@ class Node:
                 right =  self.rights[feature]
 
                 if left.lower + right.lower + 1 > self.improving: # If LB > improving, no need to ever explore
-                    left.cut_branches()
-                    right.cut_branches()
+                    left.cut_branches_infeasible()
+                    right.cut_branches_infeasible()
 
         return True # continue backpropagation
+    
+    def cut_branches_infeasible(self):
+        self.feasible = False
+        self.df = None # Remove the dataframe reference so garbage collector could maybe hopefully pick it up
+        self.best = None # Remove references to other nodes
+    
+        # Prune all children as well
+        for left in self.lefts.values():
+            left.cut_branches_infeasible() 
+        for right in self.rights.values():
+            right.cut_branches_infeasible()
+
+        # Remove references to children
+        self.lefts = {}
+        self.rights = {}
 
     # Method that prunes a subtree
     def cut_branches(self):
         self.feasible = False # Mark node as infeasible
         self.df = None # Remove the dataframe reference so garbage collector could maybe hopefully pick it up
-        self.best = self # We still need to save the best solution, since we will be cutting the branches off of solved subtrees as well. Maybe two different branch cutting methods would be more adequate
-        self.parent = None # Remove reference to parent for garbage collector
-
+        self.best = self # We still need to save the best solution, since we will be cutting the branches off of solved subtrees as well. 
         # Prune all children as well
         for left in self.lefts.values():
             left.cut_branches() 
