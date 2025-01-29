@@ -16,6 +16,7 @@ class Node:
         self.is_one_off_child = is_one_off_child
         self.set_cover_counts = set_cover_counts
         self.lefts = {}
+        self.sibling = None
         self.rights = {}
         self.best = None
         self.left = None
@@ -83,10 +84,7 @@ class Node:
         parent = self.parent
 
         f = self.parent_feat
-        if self.isLeft:
-            sibling = parent.rights[f]
-        else:
-            sibling = parent.lefts[f]
+        sibling = self.sibling
 
         # Compute the improving bound with the sibling LB and parent improving UB
         self.improving = min(self.improving, parent.improving - sibling.lower, self.upper-1)
@@ -269,9 +267,9 @@ class Node:
             return True
         if self.depth > other.depth:
             return False
-        if self.lower < other.lower:
+        if self.lower + self.sibling.lower < other.lower + other.sibling.lower:
             return True
-        if self.lower > other.lower:
+        if self.lower + self.sibling.lower > other.lower + other.sibling.lower:
             return False
         if self.is_one_off_child and not other.is_one_off_child:
             return True
@@ -294,9 +292,9 @@ class Node:
             return True
         if self.depth > other.depth:
             return False
-        if self.lower < other.lower:
+        if self.lower + self.sibling.lower < other.lower + other.sibling.lower:
             return True
-        if self.lower > other.lower:
+        if self.lower + self.sibling.lower > other.lower + other.sibling.lower:
             return False
         if self.is_one_off_child and not other.is_one_off_child:
             return True

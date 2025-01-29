@@ -488,15 +488,34 @@ class Solver:
         
         return None # If no feasible next node found
     
+    def update_sibling(self, node : Node):
+        parent = node.parent
+
+        if not node.sibling.feasible:
+            return # idc for infeasible nodes
+        
+        add_back = []
+        while not parent.pq.empty():
+            next = parent.get_pq()
+            if next.feasible:
+                add_back.append(next) # Save popped nodes for readding
+
+            if next.parent_feat == node.parent_feat: # Found the sibling
+                break 
+
+        for sibling in add_back:
+            node.parent.add_to_queue(sibling) # Add back the popped nodes
+    
     def add_back_to_pq(self, node : Node):
         parent = node.parent
         if parent is None:
-            return # No need to add these nodes back
+            return # No need to add these nodes back (we only talking about root here most likely)
         
-        parent.add_to_queue(node) # Add back to parent's PQ
-
         if not node.feasible:
             node.parent = None # Clean references for gc maybe only if node is infeasible anyway
+        else:
+            self.update_sibling(node) # Update priority of sibling
+            parent.add_to_queue(node) # Add back to parent's PQ
 
         self.add_back_to_pq(parent) # Recursive call for parent since it was popped as well
 
@@ -564,6 +583,10 @@ class Solver:
             # Create children nodes
             left = Node(left_df, i, node, True, is_one_off_child,set_cover_counts)
             right = Node(right_df, i, node, False, is_one_off_child, set_cover_counts)
+
+            # Sibling references
+            left.sibling = right
+            right.sibling = left
 
             # If leaf, mark as leaf. Otherwise compute the UB (fast-forward) and store for possible later computation of LB
             if self.check_leaf(left_df):
