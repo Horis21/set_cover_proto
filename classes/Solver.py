@@ -14,7 +14,7 @@ import gc
 import sys
 
 class Solver:
-    def __init__(self, sample_size = 15000, MIP_gap = 0.05, cover_runs = 1, lower_bound_strategy = 'both'):
+    def __init__(self, sample_size = 200, MIP_gap = 0.05, cover_runs = 1, lower_bound_strategy = 'both'):
         self.sample_size = sample_size
         self.MIP_gap = MIP_gap
         self.cover_runs = cover_runs
@@ -76,34 +76,31 @@ class Solver:
 
 
 
-    def compute_difference_table(self, node : Node):
-        df = node.df
+    def compute_difference_table(self, df):
         # Split positive and negative instances (column 0 is the label)
-        pos = df[df[0] == 1]
-        neg = df[df[0] == 0]
+        pos = df[df[0] == 1].iloc[:, 1:].to_numpy()  # Convert to NumPy arrays (faster)
+        neg = df[df[0] == 0].iloc[:, 1:].to_numpy()
 
-        # for every positive instance, and for every negative instance, compute the differences using XOR
-        for i, row1 in pos.iterrows():
-            for j, row2 in neg.iterrows():
-                dif = np.logical_xor(row1[1:], row2[1:]) # exclude label column
-                if sum(dif) == 0: continue # Do not add rows that are identical. We can never split these two instances
-                dif_tuple = tuple(dif)  # Convert to tuple for hashing
 
-                # Initialize list for storing feature values where the two rows have the same value i.e.: a zero in the difference table
-                feats = []
+        # Compute all pairwise XOR differences in a vectorized way
 
-                # Go through all the values in the difference
-                for i, x in enumerate(dif_tuple):
-                    if x == 0: # If the two rows are equal in a feature value, save what is the value that they both have
-                        feats.append(row1[i+1].item())
-                    else: #I don't care otherwise, but makes indexing easier
-                        feats.append(0) 
+        diff_matrix = np.logical_xor(pos[:, None, :], neg[None, :, :])  # Shape: (len(pos), len(neg), num_features)
 
-                if node.dt.get(dif_tuple) is None:
-                    node.dt[dif_tuple] = set() # Use a set to store all distinct lists of same feature values for each row in the difference table
+        
 
-                # For each row in the DT save all possible feature value combinations where two rows are equal. Save them in a dictionary to ensure unique rows in the difference table           
-                node.dt[dif_tuple].add(tuple(feats))
+        # Filter out identical rows
+
+        mask = diff_matrix.sum(axis=2) > 0  # Identify non-identical pairs
+
+        filtered_diffs = diff_matrix[mask]  # Apply mask
+
+        
+
+        # Convert back to DataFrame
+
+        diff_df = pd.DataFrame(filtered_diffs)
+
+        return diff_df
 
 
         
@@ -218,9 +215,9 @@ class Solver:
         for i in range(self.cover_runs):
             # Get a random sample from the rows of the difference table (This could be improved by using clustering)
             #sample = self.get_sample(df)
-            diff_table = self.get_difference_table(node)
-            sample = self.get_random_sample(diff_table)
-            features = self.find_set_cover(sample, verbose=False)
+            sample = self.get_random_sample(node.df)
+            diff_table = self.compute_difference_table(sample)
+            features = self.find_set_cover(diff_table, verbose=False)
 
             # the lower bound is the maximum of all the lower bounds we have obtained
             if len(features) > lower_bound:
@@ -461,8 +458,6 @@ class Solver:
             elif self.lower_bound_strategy == 'set-cover':
                 local_lower_bound = set_cover_lower_bound
             cache_entry.put_lower(local_lower_bound) #Add lower bound based on set cover and one_offs
-        elif self.lower_bound_strategy != 'one-off':
-            node.dt = cache_entry.get_dt() # Retrieve the difference table from the cache, since it was not computed because no set-cover was computed for this node (it was retrieved from the cahce). This will be needed when splitting the dt for the child node
         node.put_node_lower(cache_entry.get_lower())
 
 

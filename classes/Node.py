@@ -11,7 +11,6 @@ class Node:
         self.upper = 200000
         self.improving = 200000
         self.lower = 0
-        self.dt = {}
         self.depth = 0 if parent is None else parent.depth + 1
         self.feasible = True
         self.is_one_off_child = is_one_off_child
