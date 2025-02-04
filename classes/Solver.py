@@ -211,11 +211,19 @@ class Solver:
         df = node.df
         lower_bound = 0
         counts = np.zeros(df.shape[1] - 1, dtype=int)
+        if df.shape[0] <= self.sample_size:
+            diff_table = self.compute_difference_table(df)
+            features = self.find_set_cover(diff_table, verbose=False)
+
+            for f in features:
+                counts[f] += 1
+
+            return counts, len(features)
         # repeat multiple times
         for i in range(self.cover_runs):
             # Get a random sample from the rows of the difference table (This could be improved by using clustering)
             #sample = self.get_sample(df)
-            sample = self.get_random_sample(node.df)
+            sample = self.get_random_sample(df)
             diff_table = self.compute_difference_table(sample)
             features = self.find_set_cover(diff_table, verbose=False)
 
