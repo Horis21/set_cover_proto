@@ -1,4 +1,6 @@
 import queue
+
+from pandas import DataFrame
 from classes.CustomPQ import CustomPQ
 from classes.Cache import Cache
 
@@ -33,6 +35,18 @@ class Node:
     
     def get_pq(self):
         return self.pq.get()
+    
+    def queryAll(self, df: DataFrame):
+        for i, row in df.iterrows():
+            self.query(row)
+    
+    def query(self, fv):
+        if self.f is None:
+            return
+        if fv[self.f + 1] == 0:
+            self.left.query(fv)
+        else:
+            self.right.query(fv)
 
     def backpropagate(self, cache : Cache):
         parent = self.parent

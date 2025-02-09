@@ -1,3 +1,4 @@
+import time
 import pandas as pd
 import numpy as np
 import gurobipy as grb
@@ -548,6 +549,11 @@ class Solver:
             self.add_back_to_pq(node) # Add back to PQ to reupdate order
 
         size, depth = root.print_solution()
+        start_time = time.time()
+        root.queryAll(orig_df)
+        elapsed_time = time.time() - start_time
+
+        print("time: ", elapsed_time)
         return size, depth, self.explored
 
     def expand_node(self, node : Node):
