@@ -1,26 +1,41 @@
+import time
 import pandas as pd
 from pystreed import STreeDClassifier
 
-#df = pd.read_csv("data/hepatitis.csv", sep=" ", header=None)
-#df = pd.read_csv("test.csv", sep=" ", header=None)
-#df = pd.read_csv("data/vote.csv", sep=" ", header=None)
-df = pd.read_csv("experiment_datasets/cartpole/cartpole_12_versus_all.csv", sep=" ", header=None)
-
-X = df.iloc[:, 1:]
-y = df[0]
-
+names = ['data\vote.csv','data\tic-tac-toe.csv','data\monk3_bin.csv','']
 max_depth=20
-model = STreeDClassifier("cost-complex-accuracy", max_depth = max_depth, cost_complexity=1/(len(df)*2**(max_depth-1)), time_limit=60000)
-model.fit(X,y)
 
-print("size: ", model.get_n_leaves() -1)
-print("depth: ", model.get_depth())
+results = pd.DataFrame(columns=[    #     'name', 'size', 'elapsed_time'
+        ])
+for name in names:
 
-# Make predictions
-y_pred = model.predict(X)
+    df = pd.read_csv(name, sep=" ", header=None)
 
-# Calculate misclassifications
-misclassifications = (y_pred != y).sum()
+    X = df.iloc[:, 1:]
+    y = df[0]
 
-# Output the number of misclassifications
-print(f"Number of misclassifications: {misclassifications}")
+    model = STreeDClassifier("cost-complex-accuracy", max_depth = max_depth, cost_complexity=1/(len(df)*2**(max_depth-1)), time_limit=60000)
+    start_time = time.time()
+    model.fit(X,y)
+    elapsed_time = time.time() - start_time
+
+    results = pd.concat([results, pd.DataFrame([{
+                                'name': name,
+                                'size': size,
+                                'elapsed_time': elapsed_time
+                            }])], ignore_index=True)
+
+    size =  model.get_n_leaves() -1
+
+    # Make predictions
+    y_pred = model.predict(X)
+
+    # Calculate misclassifications
+    misclassifications = (y_pred != y).sum()
+
+    if misclassifications != 0:
+        print("wtf")
+
+output_csv = 'streed_results.csv'
+with open(output_csv, 'w', newline='') as file:
+            results.to_csv(file, sep=' ', index=False, header=False)

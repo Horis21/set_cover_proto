@@ -23,11 +23,11 @@ if __name__ == "__main__":
     #         results = pstats.Stats(profile)
     #         results.sort_stats(pstats.SortKey.CUMULATIVE)
     #         results.print_stats()
-    names = ['monk3_bin','hepatitis']
-    sample_sizes = [50,100,150,200]
+    names = ['hepatitis']
+    sample_sizes = [100,150]
     gaps = [0.05,0.1,0.15,0.2,0.3]
     nrs_runs = [1,2,3,5,7,10]
-    strategies = ['both', 'set-cover']
+    strategies = ['set-cover']
 
     # Initialize an empty DataFrame to store results
     
