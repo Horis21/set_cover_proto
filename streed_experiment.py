@@ -2,7 +2,7 @@ import time
 import pandas as pd
 from pystreed import STreeDClassifier
 
-names = ['data\vote.csv','data\tic-tac-toe.csv','data\monk3_bin.csv','']
+names = ['data/primary-tumor-clean.csv']
 max_depth=20
 
 results = pd.DataFrame(columns=[    #     'name', 'size', 'elapsed_time'
@@ -18,15 +18,16 @@ for name in names:
     start_time = time.time()
     model.fit(X,y)
     elapsed_time = time.time() - start_time
+    size =  model.get_n_leaves() -1
 
+    print(size, elapsed_time)
     results = pd.concat([results, pd.DataFrame([{
                                 'name': name,
                                 'size': size,
                                 'elapsed_time': elapsed_time
                             }])], ignore_index=True)
 
-    size =  model.get_n_leaves() -1
-
+    
     # Make predictions
     y_pred = model.predict(X)
 
@@ -36,6 +37,6 @@ for name in names:
     if misclassifications != 0:
         print("wtf")
 
-output_csv = 'streed_results.csv'
-with open(output_csv, 'w', newline='') as file:
-            results.to_csv(file, sep=' ', index=False, header=False)
+# output_csv = 'streed_results.csv'
+# with open(output_csv, 'w', newline='') as file:
+#             results.to_csv(file, sep=' ', index=False, header=False)
