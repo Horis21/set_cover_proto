@@ -23,8 +23,9 @@ if __name__ == "__main__":
     #         results = pstats.Stats(profile)
     #         results.sort_stats(pstats.SortKey.CUMULATIVE)
     #         results.print_stats()
-    names = ['hepatitis']
-    sample_sizes = [100,150]
+    names = ['10rooms/10rooms_8_versus_all.csv','10rooms/10rooms_9_versus_all.csv','helicopter/helicopter_13_versus_all.csv','10rooms/10rooms_7_versus_all.csv','helicopter/helicopter_12_versus_all.csv']
+    #names = ['10rooms/10rooms_8_versus_all.csv','10rooms/10rooms_9_versus_all.csv','helicopter/helicopter_13_versus_all.csv','cartpole/cartpole_12_versus_all.csv','cartpole/cartpole_15_versus_all.csv','cartpole/cartpole_18_versus_all.csv','cartpole/cartpole_20_versus_all.csv','cartpole/cartpole_21_versus_all.csv','cartpole/cartpole_22_versus_all.csv','cartpole/cartpole_28_versus_all.csv','cartpole/cartpole_29_versus_all.csv','cartpole/cartpole_43_versus_all.csv','cartpole/cartpole_44_versus_all.csv','']
+    sample_sizes = [50,100,150,200,300,400,500,600,700,800,900,1000]
     gaps = [0.05,0.1,0.15,0.2,0.3]
     nrs_runs = [1,2,3,5,7,10]
     strategies = ['set-cover']
@@ -34,7 +35,7 @@ if __name__ == "__main__":
     for name in names:
         results = pd.DataFrame(columns=[    #     'name', 'sample_size', 'gap','nr_runs', 'strategy', 'size', 'depth', 'explored', 'elapsed_time'
         ])
-        filename = 'data/' + name + '.csv'
+        filename = 'experiment_datasets/' + name 
         output_csv = name + '_binary_classification_results.csv'
         df = pd.read_csv(filename, sep=" ", header=None)
         print(f"one off features for dataset = {name}: ", Solver().one_off_features(HashableDataFrame(df)))
