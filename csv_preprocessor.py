@@ -31,8 +31,8 @@ def convert_to_dtcontrol_format(input_csv, output_csv, permissive=False, control
 
     print(f"Conversion completed. Output saved to {output_csv}")
 
-# Example usage:
-file = 'anneal'
-input_csv = 'data/' + file + '.csv'  # Path to your original CSV file
-output_csv = 'experiment_datasets/' + file +'_dtcontrol.csv'
-convert_to_dtcontrol_format(input_csv, output_csv)
+names = ['data/primary-tumor-clean.csv','data/vote.csv','data/tic-tac-toe.csv','data/monk3_bin.csv','data/hepatitis.csv','experiment_datasets/10rooms/10rooms_8_versus_all.csv','experiment_datasets/10rooms/10rooms_9_versus_all.csv','experiment_datasets/helicopter/helicopter_13_versus_all.csv','experiment_datasets/cartpole/cartpole_12_versus_all.csv','experiment_datasets/cartpole/cartpole_15_versus_all.csv','experiment_datasets/cartpole/cartpole_18_versus_all.csv','experiment_datasets/cartpole/cartpole_20_versus_all.csv','experiment_datasets/cartpole/cartpole_21_versus_all.csv','experiment_datasets/cartpole/cartpole_22_versus_all.csv','experiment_datasets/cartpole/cartpole_28_versus_all.csv','experiment_datasets/cartpole/cartpole_29_versus_all.csv','experiment_datasets/cartpole/cartpole_43_versus_all.csv','experiment_datasets/cartpole/cartpole_44_versus_all.csv','experiment_datasets/cartpole/cartpole_45_versus_all.csv','experiment_datasets/cartpole/cartpole_46_versus_all.csv','experiment_datasets/cartpole/cartpole_47_versus_all.csv','experiment_datasets/cartpole/cartpole_48_versus_all.csv','experiment_datasets/cartpole/cartpole_52_versus_all.csv','experiment_datasets/cartpole/cartpole_74_versus_all.csv']
+for file in names:
+    input_csv =  file  # Path to your original CSV file
+    output_csv = 'experiment_datasets/' + file.split(".")[0].split("/")[-1] +'_dtcontrol.csv'
+    convert_to_dtcontrol_format(input_csv, output_csv)
