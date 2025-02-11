@@ -411,66 +411,7 @@ class Solver:
             cache_entry.put_possible_feats(features)
             return features
         
-    #Return one_offs, cover_features and set cover lower bound    
-    def get_features(self, node : Node):
-        df = node.df
-        parent = node.parent
-        feature = node.parent_feat # This is the feature that the parent splits on to create this current node
-        cache_entry = self.cache.get_entry(node.df)
-        one_offs = cache_entry.get_one_offs()
-        if one_offs is None and (self.lower_bound_strategy == 'one-off' or self.lower_bound_strategy == 'both'):
-            if parent is None:
-                # Compute one-off features from scratch for the root node
-                one_offs = self.one_off_features(df)
-                cache_entry.put_one_offs(one_offs)
-            else:
-                # Otherwise simply remove the parent_feat from the list, since it was used to split 
-                parent_cache_entry = self.cache.get_entry(parent.df)
-                one_offs = parent_cache_entry.get_one_offs()
-                if feature in one_offs:
-                    one_offs.remove(feature)
-                cache_entry.put_one_offs(one_offs)
-        cover_features =  cache_entry.get_set_cover()
-        set_cover_lower_bound = 0
-        # Get set-cover lower bound from cache or compute if not present
-        if cover_features is None and (self.lower_bound_strategy == 'set-cover' or self.lower_bound_strategy == 'both'):
-            cover_features, set_cover_lower_bound = self.set_cover_features(node)
-            cache_entry.put_set_cover(cover_features)
-        return one_offs, cover_features, set_cover_lower_bound
-        
-
-    def computeUB(self, node: Node):
-        data = node.df
-        cache_entry = self.cache.get_entry(node.df)
-        if cache_entry.get_upper() is None:
-            cart = self.fast_forward(data) #Compute fast forward upper bound
-            ff = cart.get_n_leaves() - 1 if cart is not None else 0
-
-            # Save upper bound
-            cache_entry.put_upper(ff)
-            # Transform the CART tree to our Node class
-            best = self.transformTree(0, cart.tree_, node.parent, node.isLeft)
-            # Store the node
-            cache_entry.put_best(best)
-        node.put_node_upper(cache_entry.get_upper()) #Add the dataset upper bound to the node upper bound
-        node.best = cache_entry.get_best()
-        node.best.parent_feat = node.parent_feat # Updae the parent_feat of the best solution, since it is possible that a different one was used when splititng the parent, than for the one stored in the cache
-
-    def computeLB(self, node: Node):
-        data = node.df
-        cache_entry = self.cache.get_entry(node.df)     
-        if cache_entry.get_lower() is None:
-            one_offs, cover_features, set_cover_lower_bound = self.get_features(node) # Retrieve the one-off features, set-cover features and set-cover lowe bound
-            if self.lower_bound_strategy == 'both':     
-                local_lower_bound = max(len(one_offs), set_cover_lower_bound) # If both lower bound strategies are used, use the maximum
-            elif self.lower_bound_strategy == 'one-off':
-                local_lower_bound = len(one_offs)
-            elif self.lower_bound_strategy == 'set-cover':
-                local_lower_bound = set_cover_lower_bound
-            cache_entry.put_lower(local_lower_bound) #Add lower bound based on set cover and one_offs
-        node.put_node_lower(cache_entry.get_lower())
-
-
+   
     def mark_leaf(self, node : Node):
         # Set and store all bounds to 0
         cache_entry = self.cache.get_entry(node.df)
@@ -484,8 +425,6 @@ class Solver:
     def find_next(self, node : Node):
         while not node.pq.empty():
             next = node.get_pq()
-            if not next.feasible:
-                continue # Skip infeasible nodes and pop from PQ 
 
             if not next.expanded:
                 return next # Feasible and not expanded node is good!
@@ -498,33 +437,13 @@ class Solver:
         
         return None # If no feasible next node found
     
-    def update_sibling(self, node : Node):
-        parent = node.parent
-
-        if not node.sibling.feasible:
-            return # idc for infeasible nodes
-        
-        add_back = []
-        while not parent.pq.empty():
-            next = parent.get_pq()
-            if next.feasible:
-                add_back.append(next) # Save popped nodes for readding
-
-            if next.parent_feat == node.parent_feat: # Found the sibling
-                break 
-
-        for sibling in add_back:
-            node.parent.add_to_queue(sibling) # Add back the popped nodes
     
     def add_back_to_pq(self, node : Node):
         parent = node.parent
         if parent is None:
             return # No need to add these nodes back (we only talking about root here most likely)
         
-        if not node.feasible:
-            node.parent = None # Clean references for gc maybe only if node is infeasible anyway
         else:
-            self.update_sibling(node) # Update priority of sibling
             parent.add_to_queue(node) # Add back to parent's PQ
 
         self.add_back_to_pq(parent) # Recursive call for parent since it was popped as well
@@ -532,10 +451,6 @@ class Solver:
     def solve(self, orig_df):
         df = HashableDataFrame(orig_df)    
         root = Node(df)
-
-        # UB and LB for root
-        self.computeLB(root)
-        self.computeUB(root)
 
         # Expand root node
         self.expand_node(root)
@@ -579,26 +494,19 @@ class Solver:
     
         self.explored += 1  #Only updated explored nodes if no solutuion already in cache
 
-        need_LB = [] #Store nodes for which computing the LB might be needed
-        early_solution = False
-
         #Search for all features
         pos_features = self.possible_features(data, node.parent)
 
-        one_offs, cover_features, set_cover_lower_bound = self.get_features(node)
+        found_leaves = False
+
         for i in pos_features:
             #Split the data based on feature i
             left_df, right_df = self.split(data, i)
 
-            # Store whether a one-off feature was used for splitting
-            is_one_off_child = True if one_offs is not None and i in one_offs else False 
-
-            # Count how important the feature to split is in the set-cover
-            set_cover_counts = cover_features[i] if cover_features is not None else 0
 
             # Create children nodes
-            left = Node(left_df, i, node, True, is_one_off_child,set_cover_counts)
-            right = Node(right_df, i, node, False, is_one_off_child, set_cover_counts)
+            left = Node(left_df, i, node, True)
+            right = Node(right_df, i, node, False)
 
             # Sibling references
             left.sibling = right
@@ -607,40 +515,21 @@ class Solver:
             # If leaf, mark as leaf. Otherwise compute the UB (fast-forward) and store for possible later computation of LB
             if self.check_leaf(left_df):
                 self.mark_leaf(left)
+                found_leaves = True
             else:
-                need_LB.append(left)
-                self.computeUB(left)
+                node.add_to_queue(left)
             if self.check_leaf(right_df):
-                self.mark_leaf(right)
+                self.mark_leaf(right) 
+                found_leaves = True
             else:
-                need_LB.append(right)
-                self.computeUB(right)               
+                node.add_to_queue(right)   
 
             # Store a reference in the parent for all children
             node.lefts[i] = left
             node.rights[i] = right
 
-            if left.upper + right.upper + 1 == node.lower: #Early solution found
-                # Update upper bound
-                node.upper = node.lower
-
-                # Save best solution (actual solution)
-                node.save_best(i)
-
-                # Link with the solution
-                node.link_and_prune(node.best, self.cache)
-                node.mark_ready(self.cache) # Node is solved
-                early_solution = True
-                break #solution found here no need to search further
-        
-    
-        if not early_solution: # If no early solution, then compute LB for all non-leaf children nodes and backpropagate
-            for child in need_LB:
-                self.computeLB(child)
-                
-                node.add_to_queue(child)
-
+        if found_leaves:
             node.backpropagate(self.cache)
-
+        
 
        
