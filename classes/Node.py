@@ -166,6 +166,7 @@ class Node:
         # Print when root bounds get updated
         if self.parent is None:
             print(f"Updated local bounds for root lower = {self.lower}, upper = {self.upper}")
+            cache.save_bounds(self.lower, self.upper)
 
         #Cannot improve anymore if ..
         if self.lower == self.upper or self.lower > self.improving:

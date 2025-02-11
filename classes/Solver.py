@@ -15,13 +15,14 @@ import gc
 import sys
 
 class Solver:
-    def __init__(self, sample_size = 200, MIP_gap = 0.05, cover_runs = 1, lower_bound_strategy = 'both'):
+    def __init__(self, name, sample_size = 200, MIP_gap = 0.05, cover_runs = 1, lower_bound_strategy = 'both'):
         self.sample_size = sample_size
         self.MIP_gap = MIP_gap
         self.cover_runs = cover_runs
         self.lower_bound_strategy = lower_bound_strategy
         self.cache = Cache()
         self.explored = 0
+        self.name = name
 
     def split_differnce_table(self, node : Node, feat):
         parent_dt = node.dt
@@ -549,6 +550,7 @@ class Solver:
             self.add_back_to_pq(node) # Add back to PQ to reupdate order
 
         size, depth = root.print_solution()
+        self.cache.write_bounds(self.name)
         # start_time = time.time()
         # root.queryAll(orig_df)
         # elapsed_time = time.time() - start_time
