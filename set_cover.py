@@ -8,7 +8,7 @@ from wakepy import keep
 
 if __name__ == "__main__":
     #df = pd.read_csv("data/diabetes.csv", sep=" ", header=None)
-    df = pd.read_csv("data/monk3_bin.csv", sep=" ", header=None)
+    # df = pd.read_csv("data/monk3_bin.csv", sep=" ", header=None)
     #df = pd.read_csv("data/hepatitis.csv", sep=" ", header=None)
     #df = pd.read_csv("test.csv", sep=" ", header=None)
     #df = pd.read_csv("experiment_datasets\\10rooms\\10rooms_2_versus_all.csv", sep=" ", header=None)
