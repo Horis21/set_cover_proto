@@ -25,6 +25,7 @@ class Node:
         self.right = None
         self.parent = parent
         self.expanded = False
+        self.best = self
         self.pq = queue.PriorityQueue() # Local priority queue for hierarchical management
 
     def add_to_queue(self, child):
@@ -63,7 +64,7 @@ class Node:
         # Backpropagate the now solved now
         if self.parent is not None:
             self.parent.backpropagate(cache)
-        self.cut_branches() # Found solution no need to search anymore in this subtree         
+
         
     #Mark subproblem solved
     def mark_ready(self, cache : Cache): 
@@ -114,14 +115,14 @@ class Node:
         # Check if there is a better UB in the cache
         cache_entry = cache.get_entry(self.df)
         cachedUB = cache_entry.get_upper()
-        if cachedUB < self.upper:
+        if cachedUB is not None and cachedUB < self.upper:
             self.upper = cachedUB
             self.best = cache_entry.get_best() # Also get the best solution so far, since there is a better bound in the cache, it means that a better solution has been found
 
             updated = True
 
         cachedLB = cache_entry.get_lower()
-        if cachedLB > self.lower:
+        if cachedLB is not None and cachedLB > self.lower:
             self.lower = cachedLB
             updated = True
 
@@ -177,46 +178,9 @@ class Node:
                 self.mark_ready(cache) #Store solution in cache / mark node as solved only if UB == LB, otherwise we just ran out of nodes to use
 
             return False # Return false simply because link_and_prune also forwards the propgation, so no need to do it twice
-        else: # If we can still improve, prune infeasible children
-            for feature in pos_features:
-                left = self.lefts[feature]
-                right =  self.rights[feature]
 
-                if left.lower + right.lower + 1 > self.improving: # If LB > improving, no need to ever explore
-                    left.cut_branches_infeasible()
-                    right.cut_branches_infeasible()
 
         return True # continue backpropagation
-    
-    def cut_branches_infeasible(self):
-        self.feasible = False
-        self.df = None # Remove the dataframe reference so garbage collector could maybe hopefully pick it up
-        self.best = None # Remove references to other nodes
-    
-        # Prune all children as well
-        for left in self.lefts.values():
-            left.cut_branches_infeasible() 
-        for right in self.rights.values():
-            right.cut_branches_infeasible()
-
-        # Remove references to children
-        self.lefts = {}
-        self.rights = {}
-
-    # Method that prunes a subtree
-    def cut_branches(self):
-        self.feasible = False # Mark node as infeasible
-        self.df = None # Remove the dataframe reference so garbage collector could maybe hopefully pick it up
-        self.best = self # We still need to save the best solution, since we will be cutting the branches off of solved subtrees as well. 
-        # Prune all children as well
-        for left in self.lefts.values():
-            left.cut_branches() if self.f is not None and left.parent_feat == self.f else left.cut_branches_infeasible() 
-        for right in self.rights.values():
-            right.cut_branches() if self.f is not None and right.parent_feat == self.f else right.cut_branches_infeasible() 
-
-        # Remove references to children
-        self.lefts = {}
-        self.rights = {}
 
     # Some printing 
     def print_solution(self):
@@ -276,8 +240,6 @@ class Node:
     def __lt__(self, other):
         if not isinstance(other, Node):
             raise TypeError('Can only compare two Nodes')
-        if not self.feasible:
-            return True
         if self.depth < other.depth:
             return True
         if self.depth > other.depth:
@@ -289,10 +251,6 @@ class Node:
         if self.is_one_off_child and not other.is_one_off_child:
             return True
         if other.is_one_off_child:
-            return False
-        if self.set_cover_counts > other.set_cover_counts:
-            return True
-        if self.set_cover_counts < other.set_cover_counts:
             return False
         if self.upper < other.upper:
             return True
@@ -301,8 +259,6 @@ class Node:
     def __le__(self, other):
         if not isinstance(other, Node):
             raise TypeError('Can only compare two Nodes')
-        if not self.feasible:
-            return True
         if self.depth < other.depth:
             return True
         if self.depth > other.depth:
@@ -314,10 +270,6 @@ class Node:
         if self.is_one_off_child and not other.is_one_off_child:
             return True
         if other.is_one_off_child:
-            return False
-        if self.set_cover_counts > other.set_cover_counts:
-            return True
-        if self.set_cover_counts < other.set_cover_counts:
             return False
         if self.upper <= other.upper:
             return True
