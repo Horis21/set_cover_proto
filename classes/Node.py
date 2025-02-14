@@ -67,9 +67,9 @@ class Node:
         
     #Mark subproblem solved
     def mark_ready(self, cache : Cache): 
-  
-        self.best = self #Sanity check to ensure solution stored in the cache have a best tree saved. Also helps garbage collector as less distinct nodes are referenced
-        
+
+        # self.save_best(self.f, self)
+
         # Store solution in cache
         cache_entry = cache.get_entry(self.df)
         cache_entry.put_solution(self)
@@ -116,7 +116,8 @@ class Node:
         cachedUB = cache_entry.get_upper()
         if cachedUB < self.upper:
             self.upper = cachedUB
-            self.best = cache_entry.get_best() # Also get the best solution so far, since there is a better bound in the cache, it means that a better solution has been found
+            cached_best = cache_entry.get_best() # Also get the best solution so far, since there is a better bound in the cache, it means that a better solution has been found
+            self.save_best(cached_best.f, cached_best)
 
             updated = True
 
@@ -191,8 +192,7 @@ class Node:
     def cut_branches_infeasible(self):
         self.feasible = False
         self.df = None # Remove the dataframe reference so garbage collector could maybe hopefully pick it up
-        self.best = None # Remove references to other nodes
-    
+      
         # Prune all children as well
         for left in self.lefts.values():
             left.cut_branches_infeasible() 
@@ -207,7 +207,6 @@ class Node:
     def cut_branches(self):
         self.feasible = False # Mark node as infeasible
         self.df = None # Remove the dataframe reference so garbage collector could maybe hopefully pick it up
-        self.best = self # We still need to save the best solution, since we will be cutting the branches off of solved subtrees as well. 
         # Prune all children as well
         for left in self.lefts.values():
             left.cut_branches() if self.f is not None and left.parent_feat == self.f else left.cut_branches_infeasible() 

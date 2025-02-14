@@ -478,6 +478,7 @@ class Solver:
         node.put_node_lower(0)
         node.put_node_upper(0)
         cache_entry.put_upper(0)
+        node.best = node
         node.df = None # Garbage collector pls
         node.mark_ready(self.cache) # Node is solved
 
@@ -551,12 +552,12 @@ class Solver:
 
         size, depth = root.print_solution()
         self.cache.write_bounds(self.name)
-        # start_time = time.time()
-        # root.queryAll(orig_df)
-        # elapsed_time = time.time() - start_time
+        start_time = time.time()
+        root.queryAll(orig_df)
+        query_time = time.time() - start_time
         # print("time: ", elapsed_time)
         
-        return size, depth, self.explored
+        return size, depth, self.explored, query_time
 
     def expand_node(self, node : Node):
         node.expanded = True
@@ -570,11 +571,11 @@ class Solver:
 
             node.improving = solution.improving
 
+            node.save_best(solution.f, solution)
+
             # Link with solution optimal feature and resulting children
             node.link_and_prune(solution, self.cache)
 
-            # The best solution for this node is itself since now it has all the attributes of the cached solution
-            node.best = node
             return
     
         self.explored += 1  #Only updated explored nodes if no solutuion already in cache
