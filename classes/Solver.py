@@ -551,7 +551,7 @@ class Solver:
             self.add_back_to_pq(node) # Add back to PQ to reupdate order
 
         size, depth = root.print_solution()
-        self.cache.write_bounds(self.name)
+        #self.cache.write_bounds(self.name)
         start_time = time.time()
         root.queryAll(orig_df)
         query_time = time.time() - start_time
