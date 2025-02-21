@@ -45,8 +45,8 @@ def convert_csv_witty(input_file, output_file):
     # Save to a comma-separated CSV file
     df.to_csv(output_file, index=False, header=False)
 
-names = ['data/primary-tumor-clean.csv','data/vote.csv','data/tic-tac-toe.csv','data/monk3_bin.csv','data/hepatitis.csv','experiment_datasets/10rooms/10rooms_8_versus_all.csv','experiment_datasets/10rooms/10rooms_9_versus_all.csv','experiment_datasets/helicopter/helicopter_13_versus_all.csv','experiment_datasets/cartpole/cartpole_12_versus_all.csv','experiment_datasets/cartpole/cartpole_15_versus_all.csv','experiment_datasets/cartpole/cartpole_18_versus_all.csv','experiment_datasets/cartpole/cartpole_20_versus_all.csv','experiment_datasets/cartpole/cartpole_21_versus_all.csv','experiment_datasets/cartpole/cartpole_22_versus_all.csv','experiment_datasets/cartpole/cartpole_28_versus_all.csv','experiment_datasets/cartpole/cartpole_29_versus_all.csv','experiment_datasets/cartpole/cartpole_43_versus_all.csv','experiment_datasets/cartpole/cartpole_44_versus_all.csv','experiment_datasets/cartpole/cartpole_45_versus_all.csv','experiment_datasets/cartpole/cartpole_46_versus_all.csv','experiment_datasets/cartpole/cartpole_47_versus_all.csv','experiment_datasets/cartpole/cartpole_48_versus_all.csv','experiment_datasets/cartpole/cartpole_52_versus_all.csv','experiment_datasets/cartpole/cartpole_74_versus_all.csv']
+names = ['experiment_datasets/helicopter/helicopter_12_versus_all.csv']
 for file in names:
     input_csv =  file  # Path to your original CSV file
-    output_csv = 'witty_datasets/' + file.split(".")[0].split("/")[-1] +'_witty.csv'
+    output_csv =  file.split(".")[0].split("/")[-1] +'_witty.csv'
     convert_csv_witty(input_csv, output_csv)

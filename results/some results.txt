@@ -1,0 +1,2 @@
+10rooms/10rooms_9_versus_all.csv 14 nodes 7 depth
+                8_versus_all.csv 26 nodes 7 depth
