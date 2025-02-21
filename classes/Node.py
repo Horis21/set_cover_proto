@@ -37,16 +37,30 @@ class Node:
         return self.pq.get()
     
     def queryAll(self, df: DataFrame):
+        avg_length = 0
         for i, row in df.iterrows():
-            self.query(row)
-    
-    def query(self, fv):
+            avg_length += self.query(row)
+
+        return avg_length / len(df)
+
+    def _recursive_print_tree(self, ind=''):
         if self.f is None:
-            return
-        if fv[self.f + 1] == 0:
-            self.left.query(fv)
+            label = "leaf"
+            print(f"{ind}Label: {label}\n")
         else:
-            self.right.query(fv)
+            predicate = "feature " + str(self.f) + " is present"
+            print(f"{ind}{predicate} not satisfied\n")
+            self.left._recursive_print_tree(ind+"|   ")
+            print(f"{ind}{predicate} satisfied\n")
+            self.right._recursive_print_tree(ind+"|   ")
+    
+    def query(self, fv, len = 0):
+        if self.f is None:
+            return len 
+        if fv[self.f + 1] == 0:
+            return self.left.query(fv, len + 1)
+        else:
+            return self.right.query(fv, len + 1)
 
     def backpropagate(self, cache : Cache):
         parent = self.parent

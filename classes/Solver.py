@@ -551,13 +551,14 @@ class Solver:
             self.add_back_to_pq(node) # Add back to PQ to reupdate order
 
         size, depth = root.print_solution()
-        self.cache.write_bounds(self.name)
-        start_time = time.time()
-        root.queryAll(orig_df)
-        query_time = time.time() - start_time
+        root._recursive_print_tree()
+        #elf.cache.write_bounds(self.name)
+       
+        avg_question_length = root.queryAll(orig_df)
+        
         # print("time: ", elapsed_time)
         
-        return size, depth, self.explored, query_time
+        return size, depth, self.explored, avg_question_length
 
     def expand_node(self, node : Node):
         node.expanded = True
