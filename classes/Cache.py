@@ -23,7 +23,7 @@ class Cache:
                             }])], ignore_index=True)
         
     def write_bounds(self, name):
-        output_csv = 'anytime_bounds/' + name +  '_anytime_bounds.csv'
+        output_csv = 'results/anytime_bounds/' + name +  '_anytime_bounds.csv'
         with open(output_csv, 'w', newline='') as file:
                     self.bounds.to_csv(file, sep=' ', index=False, header=False)
 

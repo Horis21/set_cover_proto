@@ -25,6 +25,7 @@ def one_vs_all(df : pd.DataFrame, y):
 def check_impossible_split(df : pd.DataFrame):
     feature_vectors = {}
     intersections = {}
+    y = df[0]
     labels = np.unique(y)
     for label in labels:
         feature_vectors[label] = set(tuple(x[1:]) for x in df[df[0] == label].values)
@@ -49,9 +50,9 @@ def check_impossible_split(df : pd.DataFrame):
 def binarize_df(df):
     x = df.iloc[:, 1:]
     y = df[0]
-
+    best_df = df
     min_features_needed = 10000000
-    for n_thresholds in tqdm(range(1,2)):
+    for n_thresholds in tqdm(range(1,100)):
         binarizer = Binarizer("quantile",n_thresholds, None,None)
 
         binarizer.fit(x,y)
@@ -61,21 +62,23 @@ def binarize_df(df):
         impossible_splits = check_impossible_split(binarized_df)
         nr_impossible_splits = sum([len(v) for v in impossible_splits.values()])
 
-        max_features_needed = binarized_df.shape[1] - 1 + nr_impossible_splits
-        print("max features needed: ", max_features_needed)
+        # max_features_needed = binarized_df.shape[1] - 1 + nr_impossible_splits
+        # print("max features needed: ", max_features_needed)
 
-        if max_features_needed < min_features_needed or (max_features_needed == min_features_needed and nr_impossible_splits == 0):
-            min_features_needed = max_features_needed
+        # if max_features_needed < min_features_needed or (max_features_needed == min_features_needed and nr_impossible_splits == 0):
+        #     min_features_needed = max_features_needed
 
-            left_to_split = impossible_splits
-            best_df = binarized_df
+        #     left_to_split = impossible_splits
+        #     best_df = binarized_df
         
-        if nr_impossible_splits == 0:
-           print("found perfect split with nr of feats: ", min_features_needed)
-           break
+        if nr_impossible_splits == 0 and  best_df.shape[1] < min_features_needed:
+           best_df = binarized_df
+           min_features_needed = best_df.shape[1]
+        #    print("found perfect split with nr of feats: ", best_df.shape[1] - 1)
+        #    break
     
-    if len(left_to_split) > 0:
-        print("left to split: ", left_to_split)
+    # if len(left_to_split) > 0:
+    #     print("left to split: ", left_to_split)
     
     print("initial nr of features: ", x.shape[1])
     print("final nr of features: ", best_df.shape[1] - 1)
@@ -84,40 +87,53 @@ def binarize_df(df):
 
 
 if __name__ == "__main__":
-    loader = BenchmarkSuite()
-    preprocessor = MaxFreqPreProcessor()
-    loader.add_datasets('controller_examples', include=['aircraft'])
+    names = ['sampled_from_witty/dermatology_0.5_0.csv_bobotree.csv']
+    for name in names:
+        df = pd.read_csv(name, sep=" ", header=None)
+        binarized_df = binarize_df(df)
 
-    for ds in loader.datasets:
-        print("datsaet called: ", ds.filename)
-        ds.load_if_necessary()
+        # print(check_impossible_split(binarized_df))
+        output_csv = 'sampled_from_witty/' + name.split("/")[-1].split("\\")[-1] + '_binarized.csv'
+        print(output_csv)
+        with open(output_csv, 'w', newline='') as file:
+            binarized_df.to_csv(file, sep=' ', index=False, header=False)
+
+
+# if __name__ == "__main__":
+#     loader = BenchmarkSuite()
+#     preprocessor = MaxFreqPreProcessor()
+#     loader.add_datasets('controller_examples', include=['aircraft'])
+
+#     for ds in loader.datasets:
+#         print("datsaet called: ", ds.filename)
+#         ds.load_if_necessary()
        
-        preprocssed_dataset = preprocessor.preprocess(ds)
-        x = preprocssed_dataset.get_numeric_x()
-        y = preprocssed_dataset.get_single_labels()
+#         preprocssed_dataset = preprocessor.preprocess(ds)
+#         x = preprocssed_dataset.get_numeric_x()
+#         y = preprocssed_dataset.get_single_labels()
 
-        x_df = pd.DataFrame(x)
+#         x_df = pd.DataFrame(x)
 
-        # Flatten y to ensure it's a 1D array
-        y = y.flatten()
+#         # Flatten y to ensure it's a 1D array
+#         y = y.flatten()
         
-        # Add labels (y) as the first column
-        df = pd.concat([pd.Series(y, name=0), x_df], axis=1)
+#         # Add labels (y) as the first column
+#         df = pd.concat([pd.Series(y, name=0), x_df], axis=1)
         
-        # Rename feature columns to start from 1
-        df.columns = [0] + list(range(1, x_df.shape[1] + 1))
+#         # Rename feature columns to start from 1
+#         df.columns = [0] + list(range(1, x_df.shape[1] + 1))
         
-        # Reset the index to ensure a sequential index starting from 0
-        df.reset_index(drop=True, inplace=True)
+#         # Reset the index to ensure a sequential index starting from 0
+#         df.reset_index(drop=True, inplace=True)
 
-        with keep.running():
-             binarized_df = binarize_df(df)
+#         with keep.running():
+#              binarized_df = binarize_df(df)
 
-        one_vs_all_dfs = one_vs_all(binarized_df, y)
+#         one_vs_all_dfs = one_vs_all(binarized_df, y)
 
-        labels = np.unique(y)[:-1]
-        #Save datasets
-        for i, dataset in enumerate(one_vs_all_dfs):
-            output_csv = 'experiment_datasets/' + ds.filename.split("\\")[1].split(".")[0] + '/' + ds.filename.split("\\")[1].split(".")[0]  + '_' + str(labels[i]) + '_versus_all.csv'
-            with open(output_csv, 'w', newline='') as file:
-                dataset.to_csv(file, sep=' ', index=False, header=False)
+#         labels = np.unique(y)[:-1]
+#         #Save datasets
+#         for i, dataset in enumerate(one_vs_all_dfs):
+#             output_csv = 'experiment_datasets/' + ds.filename.split("\\")[1].split(".")[0] + '/' + ds.filename.split("\\")[1].split(".")[0]  + '_' + str(labels[i]) + '_versus_all.csv'
+#             with open(output_csv, 'w', newline='') as file:
+#                 dataset.to_csv(file, sep=' ', index=False, header=False)

@@ -552,7 +552,7 @@ class Solver:
 
         size, depth = root.print_solution()
         root._recursive_print_tree()
-        #elf.cache.write_bounds(self.name)
+        self.cache.write_bounds(self.name)
        
         avg_question_length = root.queryAll(orig_df)
         
