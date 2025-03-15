@@ -179,14 +179,14 @@ class Node:
 
 
         # Print when root bounds get updated
-        if self.parent is None:
-            print(f"Updated local bounds for root lower = {self.lower}, upper = {self.upper}")
-            cache.save_bounds(self.lower, self.upper)
+        # if self.parent is None:
+            # print(f"Updated local bounds for root lower = {self.lower}, upper = {self.upper}")
+            # cache.save_bounds(self.lower, self.upper)
 
         #Cannot improve anymore if ..
         if self.lower == self.upper or self.lower > self.improving:
-            if self.parent is None:
-                print("found root solution")
+            # if self.parent is None:
+                # print("found root solution")
             self.link_and_prune(self.best, cache) # Save best solution for this node
             if self.lower == self.upper:
                 self.mark_ready(cache) #Store solution in cache / mark node as solved only if UB == LB, otherwise we just ran out of nodes to use

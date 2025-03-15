@@ -22,6 +22,7 @@ class Solver:
         self.lower_bound_strategy = lower_bound_strategy
         self.cache = Cache()
         self.explored = 0
+        self.start_time = time.time()
         self.name = name
 
     def split_differnce_table(self, node : Node, feat):
@@ -542,6 +543,8 @@ class Solver:
         self.expand_node(root)
 
         while not root.pq.empty():
+            if time.time() - self.start_time > 3600:
+                return -1, -1, -1, -1
             node = self.find_next(root)
             if node is None:
                 break # No nodes left to search \ expand
@@ -550,15 +553,15 @@ class Solver:
 
             self.add_back_to_pq(node) # Add back to PQ to reupdate order
 
-        size, depth = root.print_solution()
-        root._recursive_print_tree()
-        self.cache.write_bounds(self.name)
+        # size, depth = root.print_solution()
+        # root._recursive_print_tree()
+        # self.cache.write_bounds(self.name)
        
-        avg_question_length = root.queryAll(orig_df)
+        # avg_question_length = root.queryAll(orig_df)
         
         # print("time: ", elapsed_time)
-        
-        return size, depth, self.explored, avg_question_length
+        return root.upper, 1, 1, 1
+        #return size, depth, self.explored, avg_question_length
 
     def expand_node(self, node : Node):
         node.expanded = True
