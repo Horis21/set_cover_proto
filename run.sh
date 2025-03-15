@@ -23,7 +23,7 @@ module load py-mpi4py
 python -m ensurepip --upgrade
 
 # Install required Python packages
-python -m pip install --user gurobipy > pip_install.log 2>&1
+python -m pip install --user gurobipy wakepy > pip_install.log 2>&1
 
 # Check if pip install was successful
 if [ $? -ne 0 ]; then
@@ -32,7 +32,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Run the Python script
-srun python set-cover.py > output.log 2>&1
+srun python set_cover.py > output.log 2>&1
 
 # Check if python script was successful
 if [ $? -ne 0 ]; then
