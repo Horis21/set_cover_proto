@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 from dtcontrol.benchmark_suite import BenchmarkSuite
 from dtcontrol.pre_processing.label_pre_processor import LabelPreProcessor
@@ -50,8 +51,7 @@ def check_impossible_split(df : pd.DataFrame):
 def binarize_df(df):
     x = df.iloc[:, 1:]
     y = df[0]
-    best_df = df
-    min_features_needed = 10000000
+
     for n_thresholds in tqdm(range(1,100)):
         binarizer = Binarizer("quantile",n_thresholds, None,None)
 
@@ -61,42 +61,37 @@ def binarize_df(df):
         
         impossible_splits = check_impossible_split(binarized_df)
         nr_impossible_splits = sum([len(v) for v in impossible_splits.values()])
-
-        # max_features_needed = binarized_df.shape[1] - 1 + nr_impossible_splits
-        # print("max features needed: ", max_features_needed)
-
-        # if max_features_needed < min_features_needed or (max_features_needed == min_features_needed and nr_impossible_splits == 0):
-        #     min_features_needed = max_features_needed
-
-        #     left_to_split = impossible_splits
-        #     best_df = binarized_df
         
-        if nr_impossible_splits == 0 and  best_df.shape[1] < min_features_needed:
-           best_df = binarized_df
-           min_features_needed = best_df.shape[1]
-        #    print("found perfect split with nr of feats: ", best_df.shape[1] - 1)
-        #    break
+        if nr_impossible_splits == 0:
+            break
     
-    # if len(left_to_split) > 0:
-    #     print("left to split: ", left_to_split)
+    if nr_impossible_splits > 0:
+        print("wtf")
     
-    print("initial nr of features: ", x.shape[1])
-    print("final nr of features: ", best_df.shape[1] - 1)
-    print("best df: ", best_df)
-    return best_df
+    # print("initial nr of features: ", x.shape[1])
+    # print("final nr of features: ", best_df.shape[1] - 1)
+    # print("best df: ", best_df)
+    return binarized_df
+
+def is_binary(df):
+    return df.isin([0, 1]).all().all()
+
 
 
 if __name__ == "__main__":
-    names = ['sampled_from_witty/dermatology_0.5_0.csv_bobotree.csv']
-    for name in names:
-        df = pd.read_csv(name, sep=" ", header=None)
-        binarized_df = binarize_df(df)
+    directory = 'sampled_from_witty'
+    for filename in os.scandir(directory):
+        if filename.is_file():
+            input_csv =  filename.path  # Path to your original CSV file
+            df = pd.read_csv(input_csv, sep=" ", header=None)
+            if not is_binary(df):
+                binarized_df = binarize_df(df)
 
-        # print(check_impossible_split(binarized_df))
-        output_csv = 'sampled_from_witty/' + name.split("/")[-1].split("\\")[-1] + '_binarized.csv'
-        print(output_csv)
-        with open(output_csv, 'w', newline='') as file:
-            binarized_df.to_csv(file, sep=' ', index=False, header=False)
+                # print(check_impossible_split(binarized_df))
+                output_csv = input_csv
+                # print(output_csv)
+                with open(output_csv, 'w', newline='') as file:
+                    binarized_df.to_csv(file, sep=' ', index=False, header=False)
 
 
 # if __name__ == "__main__":
