@@ -14,7 +14,7 @@ module load py-scikit-learn
 module load python
 module load py-numpy
 module load py-pandas
-module load gurobi/11.0.1
+module load gurobi/12.0.0
 module load py-mpi4py
 
 
