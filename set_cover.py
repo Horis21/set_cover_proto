@@ -34,9 +34,18 @@ if __name__ == "__main__":
     # gaps = [0.4,0.5,0.6,0.7,0.8,0.9]
     # nrs_runs = [1,3,5,7]
     # Initialize an empty DataFrame to store results
-    
-    number_binarized_datasets= 580
-    output_csv = 'bobotree_results3.csv'
+    file_path = 'binarized_datasets.txt'
+
+
+    with open(file_path, 'r') as file:
+        file_content = []
+        line = file.readline()
+        
+        while line:
+            name = line.split("/")[-1].split("\\")[0].split("_")[0] + "_" + line.split("/")[-1].split("\\")[0].split("_")[1] + "_" + line.split("/")[-1].split("\\")[0].split("_")[2]
+            file_content.append(name)
+            line = file.readline()
+    output_csv = 'bobotree_results4.csv'
     witty_results = pd.read_csv("Witty_results - Copy.csv",sep=";" , header = None) 
     # print(witty_results.shape)
     results = pd.DataFrame(columns=[    #     'name', 'size', 'witty_size, 'elapsed_time', 'witty_time, 'number_instances', 'number_features', 'number_features_bobo', 'hamming_distance', 'cuts'
@@ -45,10 +54,15 @@ if __name__ == "__main__":
     # for index, filename in enumerate(os.scandir(directory)):
     #     if filename.is_file():
     for i, row in witty_results.iterrows():
-            if(row[13] == -1):
-                continue # Skip datasets where the "efficient" algorithm timeouts
+            
 
             name = row[2].split("/")[-1].split("\\")[-1]
+            
+            if(row[13] != -1 or name in file_content):
+                continue # Skip datasets where the "efficient" algorithm timeouts
+            
+            print(name)
+            continue
             input_csv = 'sampled_from_witty/' + name + "_bobotree.csv"  # Path to your original CSV file
             df = pd.read_csv(input_csv, sep=" ", header=None)
                        
